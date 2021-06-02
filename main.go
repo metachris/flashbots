@@ -43,14 +43,12 @@ func main() {
 
 	if *datePtr != "" || *blockHeightPtr != 0 {
 		// A start for historical analysis was given
-		// log.Fatal("Missing start (date or block). Add with -date <yyyy-mm-dd> or -block <blockNum>")
 		startBlock, endBlock := getBlockRangeFromArguments(client, *blockHeightPtr, *datePtr, *hourPtr, *minPtr, *lenPtr)
-		// fmt.Println(startBlock, endBlock)
 		checkBlockRange(client, startBlock, endBlock)
-	}
-
-	if *watchPtr {
+	} else if *watchPtr {
 		watch(client)
+	} else {
+		fmt.Println("Nothing to do, check the help with -h.")
 	}
 }
 
