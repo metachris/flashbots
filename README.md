@@ -1,6 +1,6 @@
-# Flashbots (failed) transactions
+# Flashbots failed transactions
 
-Iterate over Ethereum blocks to get (failed) Flashbots transactions.
+Iterate over Ethereum blocks to get failed [Flashbots](https://github.com/flashbots/pm) transactions.
 
 Uses https://github.com/metachris/go-ethutils
 
@@ -27,11 +27,11 @@ go run . -date 2021-05-25 -len 1h  # all blocks within 1 hour of given date 00:0
 go run . -date 2021-05-25 -hour 12 -min 5 -len 1h  # all blocks within 1 hour of given date 12:05:00 (UTC)
 ```
 
-You can also install this tool as `flashbots-tx` binary:
+You can also install this tool as `flashbots-failed-tx` binary:
 
 ```bash
-go install github.com/metachris/flashbots-tx@latest
-flashbots-tx -h
+go install github.com/metachris/flashbots-failed-tx@latest
+flashbots-failed-tx -h
 ```
 
 

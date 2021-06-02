@@ -1,4 +1,4 @@
-module github.com/metachris/flashbots-tx
+module github.com/metachris/flashbots-failed-tx
 
 go 1.16
 
