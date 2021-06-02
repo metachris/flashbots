@@ -19,6 +19,7 @@ go run . -block 12539827 -len 5    # 5 blocks
 go run . -block 12539827 -len 10m  # all blocks within 10 minutes of given block
 go run . -block 12539827 -len 1h   # all blocks within 1 hour of given block
 go run . -block 12539827 -len 1d   # all blocks within 1 day of given block
+go run . -block 12539827 -len 1d -silent  # don't print information for every block
 
 # Historic, using a starting date
 go run . -date -1d -len 1h         # all blocks within 1 hour of yesterday 00:00:00 (UTC)
