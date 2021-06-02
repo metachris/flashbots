@@ -204,7 +204,6 @@ func checkBlockWithReceipts(b *blockswithtx.BlockWithTxReceipts) {
 			if receipt.Status == 1 { // successful tx
 				// fmt.Printf("Flashbots tx in block %v: %s from %v\n", b.Block.Number(), tx.Hash(), sender)
 			} else { // failed tx
-				// fmt.Printf("block %v: failed Flashbots tx %s from %v\n", WarningColor, b.Block.Number(), tx.Hash(), sender)
 				utils.ColorPrintf(utils.ErrorColor, "block %v: failed Flashbots tx %s from %v\n", b.Block.Number(), tx.Hash(), sender)
 			}
 		}

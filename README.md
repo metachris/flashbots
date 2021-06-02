@@ -23,8 +23,8 @@ go run . -block 12539827 -len 1d -silent  # don't print information for every bl
 
 # Historic, using a starting date
 go run . -date -1d -len 1h         # all blocks within 1 hour of yesterday 00:00:00 (UTC)
-go run . -date 2021-05-25 -len 1h  # all blocks within 1 hour of given date 00:00:00 (UTC)
-go run . -date 2021-05-25 -hour 12 -min 5 -len 1h  # all blocks within 1 hour of given date 12:05:00 (UTC)
+go run . -date 2021-05-31 -len 1d  # all blocks from this day (00:00:00 -> 23:59:59 UTC)
+go run . -date 2021-05-31 -hour 3 -min 53 -len 5m  # all blocks within 1 hour of given date and time (UTC)
 ```
 
 You can also install this tool as `flashbots-failed-tx` binary:
