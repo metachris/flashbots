@@ -4,7 +4,7 @@ Iterate over Ethereum blocks to get failed [Flashbots](https://github.com/flashb
 
 Uses https://github.com/metachris/go-ethutils
 
-Notes: 
+Notes:
 
 * You can set the geth node URI as environment variable `ETH_NODE`, or pass it in as `-eth` argument.
 * You should use an IPC connection to the geth node, as there are a lot of API calls (one for each tx).
@@ -12,6 +12,7 @@ Notes:
 ```bash
 # Subscribe to new blocks and find failed Flashbots tx:
 go run . -watch
+go run . -watch -silent  # print only failed transactions
 
 # Historic, using a starting block
 go run . -block 12539827           # 1 block
