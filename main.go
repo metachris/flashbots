@@ -97,7 +97,7 @@ func watch(client *ethclient.Client) {
 			utils.Perror(err)
 
 			if !silent {
-				utils.PrintBlock(b.Block)
+				fmt.Println("Queueing new block", b.Block.Number())
 			}
 
 			// Add to backlog
@@ -123,7 +123,7 @@ func watch(client *ethclient.Client) {
 
 func checkBlock(b *blockswithtx.BlockWithTxReceipts) {
 	if !silent {
-		fmt.Println("checkBlock", b.Block.Number())
+		utils.PrintBlock(b.Block)
 	}
 
 	for _, tx := range b.Block.Transactions() {
