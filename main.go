@@ -62,7 +62,7 @@ func checkBlockRange(client *ethclient.Client, startHeight int64, endHeight int6
 		lock.Lock()
 		defer lock.Unlock()
 		for b := range blockChan {
-			checkBlockWithReceipts(b)
+			processBlockWithReceipts(b)
 			numTx += int64(len(b.Block.Transactions()))
 		}
 	}()
@@ -93,17 +93,46 @@ func watch(client *ethclient.Client) {
 		case header := <-headers:
 			b, err := blockswithtx.GetBlockWithTxReceipts(client, header.Number.Int64())
 			utils.Perror(err)
-			checkBlockWithReceipts(b)
+			processBlockWithReceipts(b)
 		}
 	}
 }
 
-func checkBlockWithReceipts(b *blockswithtx.BlockWithTxReceipts) {
-	if !silent {
-		utils.PrintBlock(b.Block)
+var blockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
+
+func processBlockWithReceipts(b *blockswithtx.BlockWithTxReceipts) {
+	utils.PrintBlock(b.Block)
+	blockHeight := b.Block.Number().Int64()
+
+	// Add to backlog
+	blockBacklog[blockHeight] = b
+
+	// Query flashbots API to get latest
+	flashbotsResponse, err := GetFlashbotsBlock(blockHeight)
+	utils.Perror(err)
+
+	// Iterate over backlog and process blocks that have flashbots info
+	for height, backlogBlock := range blockBacklog {
+		if height <= flashbotsResponse.LatestBlockNumber {
+			checkBlock(backlogBlock)
+		}
 	}
+}
+
+func checkBlock(b *blockswithtx.BlockWithTxReceipts) {
+	flashbotsResponse, err := GetFlashbotsBlock(b.Block.Number().Int64())
+	if err != nil {
+		log.Println("Flashbots API error", err)
+		return
+	}
+	if flashbotsResponse.LatestBlockNumber < b.Block.Number().Int64() {
+		log.Println("Flashbots API latest height < block height")
+		return
+	}
+	flashbotsTx := flashbotsResponse.GetTxMap()
 
 	for _, tx := range b.Block.Transactions() {
+		_, isFlashbotsTx := flashbotsTx[tx.Hash().String()]
 		receipt := b.TxReceipts[tx.Hash()]
 		if receipt == nil {
 			continue
@@ -114,8 +143,22 @@ func checkBlockWithReceipts(b *blockswithtx.BlockWithTxReceipts) {
 			if receipt.Status == 1 { // successful tx
 				// fmt.Printf("Flashbots tx in block %v: %s from %v\n", b.Block.Number(), tx.Hash(), sender)
 			} else { // failed tx
-				utils.ColorPrintf(utils.ErrorColor, "block %v: failed Flashbots tx %s from %v\n", b.Block.Number(), tx.Hash(), sender)
+				if isFlashbotsTx {
+					utils.ColorPrintf(utils.ErrorColor, "block %v: failed Flashbots tx %s from %v\n", b.Block.Number(), tx.Hash(), sender)
+				} else {
+					utils.ColorPrintf(utils.ErrorColor, "block %v: failed 0-gas tx %s from %v\n", b.Block.Number(), tx.Hash(), sender)
+				}
 			}
 		}
 	}
+
 }
+
+// // Do an API call to flashbots, to see if this block is already included
+// if !silent {
+// 	utils.PrintBlock(b.Block)
+// }
+
+// r, err := GetFlashbotsBlock(12566509)
+// fmt.Println(r)
+// return
