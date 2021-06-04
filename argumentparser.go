@@ -61,13 +61,16 @@ func getBlockRangeFromArguments(client *ethclient.Client, blockHeight int, date 
 		// Negative date prefix (-1d, -2m, -1y)
 		if strings.HasPrefix(date, "-") {
 			if strings.HasSuffix(date, "d") {
-				t := time.Now().AddDate(0, 0, -1)
+				days, _ := strconv.Atoi(date[1 : len(date)-1])
+				t := time.Now().AddDate(0, 0, -days) // todo
 				startTime = t.Truncate(24 * time.Hour)
 			} else if strings.HasSuffix(date, "m") {
-				t := time.Now().AddDate(0, -1, 0)
+				months, _ := strconv.Atoi(date[1 : len(date)-1])
+				t := time.Now().AddDate(0, -months, 0)
 				startTime = t.Truncate(24 * time.Hour)
 			} else if strings.HasSuffix(date, "y") {
-				t := time.Now().AddDate(-1, 0, 0)
+				years, _ := strconv.Atoi(date[1 : len(date)-1])
+				t := time.Now().AddDate(-years, 0, 0)
 				startTime = t.Truncate(24 * time.Hour)
 			} else {
 				panic(fmt.Sprintf("Not a valid date offset: '%s'. Can be d, m, y", date))
@@ -87,7 +90,8 @@ func getBlockRangeFromArguments(client *ethclient.Client, blockHeight int, date 
 	} else if timespanSec > 0 {
 		endTime := startTime.Add(time.Duration(timespanSec) * time.Second)
 		// fmt.Printf("endTime: %v\n", endTime.UTC())
-		endBlockHeader, _ := utils.GetFirstBlockHeaderAtOrAfterTime(client, endTime)
+		endBlockHeader, err := utils.GetFirstBlockHeaderAtOrAfterTime(client, endTime)
+		utils.Perror(err)
 		endBlock = endBlockHeader.Number.Int64() - 1
 	} else {
 		panic("No valid block range")
