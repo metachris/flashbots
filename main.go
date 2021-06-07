@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -16,7 +18,18 @@ import (
 	"github.com/metachris/go-ethutils/utils"
 )
 
-var silent bool = false
+type FailedTx struct {
+	Hash        string
+	From        string
+	To          string
+	Block       uint64
+	IsFlashbots bool // if false then it's a failed 0-gas tx but not from Flashbots
+}
+
+const WebserverAddr string = ":6067"
+
+var silent bool
+var isWatchMode bool
 
 func main() {
 	ethUri := flag.String("eth", os.Getenv("ETH_NODE"), "Ethereum node URI")
@@ -79,14 +92,22 @@ func checkBlockRange(client *ethclient.Client, startHeight int64, endHeight int6
 	fmt.Printf("Processed %s blocks (%s transactions) in %.3f seconds\n", utils.NumberToHumanReadableString(endHeight-startHeight+1, 0), utils.NumberToHumanReadableString(numTx, 0), t2.Seconds())
 }
 
-var blockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
+var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
+var FailedTxHistory []FailedTx = make([]FailedTx, 0, 100)
 
 func watch(client *ethclient.Client) {
+	isWatchMode = true
 	headers := make(chan *types.Header)
 	sub, err := client.SubscribeNewHead(context.Background(), headers)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Start the webserver
+	go func() {
+		http.HandleFunc("/failedTx", failedTxHistoryHandler)
+		log.Fatal(http.ListenAndServe(WebserverAddr, nil))
+	}()
 
 	for {
 		select {
@@ -101,7 +122,7 @@ func watch(client *ethclient.Client) {
 			}
 
 			// Add to backlog
-			blockBacklog[header.Number.Int64()] = b
+			BlockBacklog[header.Number.Int64()] = b
 
 			// Query flashbots API to get latest block it has processed
 			flashbotsResponse, err := GetFlashbotsBlock(header.Number.Int64())
@@ -109,10 +130,9 @@ func watch(client *ethclient.Client) {
 				log.Println("error:", err)
 				continue
 			}
-			// fmt.Println("- Flashbots API latest:", flashbotsResponse.LatestBlockNumber)
 
 			// Process all possible blocks in the backlog
-			for height, backlogBlock := range blockBacklog {
+			for height, backlogBlock := range BlockBacklog {
 				if height <= flashbotsResponse.LatestBlockNumber {
 					checkBlock(backlogBlock)
 				}
@@ -144,6 +164,20 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) {
 					return
 				}
 
+				// Remember past 100 failed TX
+				failedTx := FailedTx{
+					Hash:        tx.Hash().String(),
+					From:        sender.String(),
+					To:          tx.To().String(),
+					Block:       b.Block.Number().Uint64(),
+					IsFlashbots: isFlashbotsTx,
+				}
+				if len(FailedTxHistory) == 100 { // remove first entry
+					FailedTxHistory = FailedTxHistory[1:]
+				}
+				FailedTxHistory = append(FailedTxHistory, failedTx)
+
+				// Print to terminal
 				if isFlashbotsTx {
 					utils.ColorPrintf(utils.ErrorColor, "failed Flashbots tx %s from %v in block %s\n", tx.Hash(), sender, b.Block.Number())
 				} else {
@@ -153,5 +187,10 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) {
 		}
 	}
 
-	delete(blockBacklog, b.Block.Number().Int64())
+	delete(BlockBacklog, b.Block.Number().Int64())
+}
+
+func failedTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(FailedTxHistory)
 }
