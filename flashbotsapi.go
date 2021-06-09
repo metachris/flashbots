@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrFlashbotsApiDoesntHaveThatBlockYet = errors.New("flashbots API latest height < block height")
+	ErrFlashbotsApiDoesntHaveThatBlockYet = errors.New("flashbots API latest height < requested block height")
 )
 
 type FlashbotsApiTransaction struct {

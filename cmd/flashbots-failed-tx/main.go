@@ -201,10 +201,14 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []flashbotsfailed
 				}
 
 				// Remember the failed tx
+				var to string
+				if tx.To() != nil {
+					to = tx.To().String()
+				}
 				failedTx = append(failedTx, flashbotsfailedtx.FailedTx{
 					Hash:        tx.Hash().String(),
 					From:        sender.String(),
-					To:          tx.To().String(),
+					To:          to,
 					Block:       b.Block.Number().Uint64(),
 					IsFlashbots: isFlashbotsTx,
 				})
