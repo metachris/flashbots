@@ -11,27 +11,27 @@ Notes:
 
 ```bash
 # Subscribe to new blocks and find failed Flashbots tx:
-go run . -watch
-go run . -watch -silent  # print only failed transactions
+go run cmd/flashbots-failed-tx/main.go -watch
+go run cmd/flashbots-failed-tx/main.go -watch -silent  # print only failed transactions
 
 # Historic, using a starting block
-go run . -block 12539827           # 1 block
-go run . -block 12539827 -len 5    # 5 blocks
-go run . -block 12539827 -len 10m  # all blocks within 10 minutes of given block
-go run . -block 12539827 -len 1h   # all blocks within 1 hour of given block
-go run . -block 12539827 -len 1d   # all blocks within 1 day of given block
-go run . -block 12539827 -len 1d -silent  # don't print information for every block
+go run cmd/flashbots-failed-tx/main.go -block 12539827           # 1 block
+go run cmd/flashbots-failed-tx/main.go -block 12539827 -len 5    # 5 blocks
+go run cmd/flashbots-failed-tx/main.go -block 12539827 -len 10m  # all blocks within 10 minutes of given block
+go run cmd/flashbots-failed-tx/main.go -block 12539827 -len 1h   # all blocks within 1 hour of given block
+go run cmd/flashbots-failed-tx/main.go -block 12539827 -len 1d   # all blocks within 1 day of given block
+go run cmd/flashbots-failed-tx/main.go -block 12539827 -len 1d -silent  # don't print information for every block
 
 # Historic, using a starting date
-go run . -date -1d -len 1h         # all blocks within 1 hour of yesterday 00:00:00 (UTC)
-go run . -date 2021-05-31 -len 1d  # all blocks from this day (00:00:00 -> 23:59:59 UTC)
-go run . -date 2021-05-31 -hour 3 -min 53 -len 5m  # all blocks within 1 hour of given date and time (UTC)
+go run cmd/flashbots-failed-tx/main.go -date -1d -len 1h         # all blocks within 1 hour of yesterday 00:00:00 (UTC)
+go run cmd/flashbots-failed-tx/main.go -date 2021-05-31 -len 1d  # all blocks from this day (00:00:00 -> 23:59:59 UTC)
+go run cmd/flashbots-failed-tx/main.go -date 2021-05-31 -hour 3 -min 53 -len 5m  # all blocks within 1 hour of given date and time (UTC)
 ```
 
 You can also install this tool as `flashbots-failed-tx` binary:
 
 ```bash
-go install github.com/metachris/flashbots-failed-tx@latest
+go install github.com/metachris/flashbots-failed-tx/cmd/flashbots-failed-tx@latest
 flashbots-failed-tx -h
 ```
 

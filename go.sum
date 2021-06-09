@@ -243,6 +243,8 @@ github.com/mattn/go-tty v0.0.0-20180907095812-13ff1204f104/go.mod h1:XPvLUNfbS4f
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/metachris/go-ethutils v0.2.2 h1:x8TE4S6WjfiRIypey/tLHOS+4sd/iAWS0Q0ylvhfvYA=
 github.com/metachris/go-ethutils v0.2.2/go.mod h1:Xf7YbIhXJUtYLoXkShBhs1CAzDD6jSkHePFjShLv/Do=
+github.com/metachris/go-ethutils v0.3.0 h1:vT0QsO2ytLTMWmoF85Tpz4CH0gDTkx8muObgeRz8esI=
+github.com/metachris/go-ethutils v0.3.0/go.mod h1:Xf7YbIhXJUtYLoXkShBhs1CAzDD6jSkHePFjShLv/Do=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/mschoch/smat v0.0.0-20160514031455-90eadee771ae/go.mod h1:qAyveg+e4CE+eKJXWVjKXM4ck2QobLqTDytGJbLLhJg=

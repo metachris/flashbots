@@ -1,4 +1,4 @@
-package main
+package flashbotsfailedtx
 
 import (
 	"encoding/json"
@@ -7,6 +7,10 @@ import (
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/core/types"
+)
+
+var (
+	ErrFlashbotsApiDoesntHaveThatBlockYet = errors.New("flashbots API latest height < block height")
 )
 
 type FlashbotsApiTransaction struct {
@@ -48,6 +52,12 @@ func (r *FlashbotsBlockApiResponse) GetTxMap() map[string]FlashbotsApiTransactio
 	return res
 }
 
+func (r *FlashbotsBlockApiResponse) IsFlashbotsTx(hash string) bool {
+	txMap := r.GetTxMap()
+	_, exists := txMap[hash]
+	return exists
+}
+
 // https://blocks.flashbots.net/v1/blocks
 func GetFlashbotsBlock(blockNumber int64) (response FlashbotsBlockApiResponse, err error) {
 	url := fmt.Sprintf("https://blocks.flashbots.net/v1/blocks?block_number=%d", blockNumber)
@@ -64,26 +74,17 @@ func GetFlashbotsBlock(blockNumber int64) (response FlashbotsBlockApiResponse, e
 	return response, nil
 }
 
-var (
-	ErrFlashbotsApiDoesntHaveThatBlockYet = errors.New("flashbots API latest height < block height")
-)
-
-func IsFlashbotsTx(block *types.Block, tx *types.Transaction) (isFlashbotsTx bool, err error) {
+func IsFlashbotsTx(block *types.Block, tx *types.Transaction) (isFlashbotsTx bool, response FlashbotsBlockApiResponse, err error) {
 	flashbotsResponse, err := GetFlashbotsBlock(block.Number().Int64())
 	if err != nil {
-		return isFlashbotsTx, err
+		return isFlashbotsTx, response, err
 	}
 
 	if flashbotsResponse.LatestBlockNumber < block.Number().Int64() {
-		return isFlashbotsTx, ErrFlashbotsApiDoesntHaveThatBlockYet
+		return isFlashbotsTx, response, ErrFlashbotsApiDoesntHaveThatBlockYet
 	}
 
 	flashbotsTx := flashbotsResponse.GetTxMap()
-
-	// fmt.Println("x", tx.Hash().String())
-	// for k := range flashbotsTx {
-	// 	fmt.Println("-", k)
-	// }
 	_, exists := flashbotsTx[tx.Hash().String()]
-	return exists, nil
+	return exists, response, nil
 }
