@@ -88,13 +88,8 @@ func checkBlockRange(client *ethclient.Client, startHeight int64, endHeight int6
 // BlockBacklog is used in watch mode: new blocks are added to the backlog until they are processed by the Flashbots backend (the API has ~5 blocks delay)
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
 
-type BlockWithFailedTx struct {
-	BlockHeight int64
-	FailedTx    []flashbotsfailedtx.FailedTx
-}
-
 // FailedTxHistory is used to serve the most recent failed tx via the webserver
-var FailedTxHistory []BlockWithFailedTx = make([]BlockWithFailedTx, 0, 100)
+var FailedTxHistory []flashbotsfailedtx.BlockWithFailedTx = make([]flashbotsfailedtx.BlockWithFailedTx, 0, 100)
 
 func watch(client *ethclient.Client) {
 	headers := make(chan *types.Header)
@@ -138,7 +133,7 @@ func watch(client *ethclient.Client) {
 					txs := checkBlock(backlogBlock)
 
 					// Append failed 0-gas/flashbots tx to history
-					FailedTxHistory = append(FailedTxHistory, BlockWithFailedTx{
+					FailedTxHistory = append(FailedTxHistory, flashbotsfailedtx.BlockWithFailedTx{
 						BlockHeight: b.Block.Number().Int64(),
 						FailedTx:    txs,
 					})
