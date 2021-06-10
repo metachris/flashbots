@@ -135,7 +135,7 @@ func watch(client *ethclient.Client) {
 					if len(txs) > 0 {
 						// Append failed 0-gas/flashbots tx to history
 						FailedTxHistory = append(FailedTxHistory, flashbotsfailedtx.BlockWithFailedTx{
-							BlockHeight: b.Block.Number().Int64(),
+							BlockHeight: backlogBlock.Block.Number().Int64(),
 							FailedTx:    txs,
 						})
 						if len(FailedTxHistory) == 100 { // truncate history
