@@ -1,8 +1,15 @@
-# Flashbots failed transactions
+# Failed Flashbots / 0-Gas Transactions
 
-Iterate over Ethereum blocks to get failed [Flashbots](https://github.com/flashbots/pm) transactions.
+Tool to spot failed [Flashbots](https://github.com/flashbots/pm) and 0-gas transactions.
 
-Uses https://github.com/metachris/go-ethutils
+Telegram bot which publishes the latest of those failed transactions:
+
+* https://t.me/FlashbotsBot
+* https://github.com/metachris/flashbots-tx-telegram-bot
+
+---
+
+This tool uses https://github.com/metachris/go-ethutils
 
 Notes:
 
