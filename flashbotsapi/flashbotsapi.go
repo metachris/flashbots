@@ -1,4 +1,4 @@
-// Client for [Flashbots mev-blocks API](https://blocks.flashbots.net/)
+// Client for Flashbots mev-blocks API: https://blocks.flashbots.net/
 package flashbotsapi
 
 import (
@@ -43,6 +43,7 @@ type FlashbotsApiTransaction struct {
 	TotalMinerReward string `json:"total_miner_reward"`
 }
 
+// GetTxMap returns a map of all transactions, indexed by hash
 func (r *FlashbotsBlockApiResponse) GetTxMap() map[string]FlashbotsApiTransaction {
 	res := make(map[string]FlashbotsApiTransaction)
 	for _, b := range r.Blocks {
@@ -53,15 +54,17 @@ func (r *FlashbotsBlockApiResponse) GetTxMap() map[string]FlashbotsApiTransactio
 	return res
 }
 
-func (r *FlashbotsBlockApiResponse) IsFlashbotsTx(hash string) bool {
+// HasTx returns true if the transaction hash is included in any of the blocks of the API response
+func (r *FlashbotsBlockApiResponse) HasTx(hash string) bool {
 	txMap := r.GetTxMap()
 	_, exists := txMap[hash]
 	return exists
 }
 
 // https://blocks.flashbots.net/v1/blocks
-func GetFlashbotsBlock(blockNumber int64) (response FlashbotsBlockApiResponse, err error) {
-	url := fmt.Sprintf("https://blocks.flashbots.net/v1/blocks?block_number=%d", blockNumber)
+func GetFlashbotsBlock(options BlockApiOptions) (response FlashbotsBlockApiResponse, err error) {
+	url := fmt.Sprintf("https://blocks.flashbots.net/v1/blocks%s", options.ToUriQuery())
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return response, err
@@ -76,7 +79,7 @@ func GetFlashbotsBlock(blockNumber int64) (response FlashbotsBlockApiResponse, e
 }
 
 func IsFlashbotsTx(block *types.Block, tx *types.Transaction) (isFlashbotsTx bool, response FlashbotsBlockApiResponse, err error) {
-	flashbotsResponse, err := GetFlashbotsBlock(block.Number().Int64())
+	flashbotsResponse, err := GetFlashbotsBlock(BlockApiOptions{BlockNumber: block.Number().Int64()})
 	if err != nil {
 		return isFlashbotsTx, response, err
 	}

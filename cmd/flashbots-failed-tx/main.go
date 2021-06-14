@@ -121,7 +121,7 @@ func watch(client *ethclient.Client) {
 			BlockBacklog[header.Number.Int64()] = b
 
 			// Query flashbots API to get latest block it has processed
-			flashbotsResponse, err := flashbotsapi.GetFlashbotsBlock(header.Number.Int64())
+			flashbotsResponse, err := flashbotsapi.GetFlashbotsBlock(flashbotsapi.BlockApiOptions{BlockNumber: header.Number.Int64()})
 			if err != nil {
 				log.Println("error:", err)
 				continue
