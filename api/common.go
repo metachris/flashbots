@@ -1,5 +1,5 @@
 // Client for Flashbots mev-blocks API: https://blocks.flashbots.net/
-package flashbotsapi
+package api
 
 type FlashbotsBlock struct {
 	BlockNumber       int64  `json:"block_number"`

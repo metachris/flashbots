@@ -1,30 +1,30 @@
 // Client for [Flashbots mev-blocks API](https://blocks.flashbots.net/)
-package flashbotsapi_test
+package api_test
 
 import (
 	"testing"
 
-	"github.com/metachris/flashbots-failed-tx/flashbotsapi"
+	"github.com/metachris/flashbots/api"
 )
 
 func TestBlocksApi(t *testing.T) {
-	opts := flashbotsapi.GetBlocksOptions{}
+	opts := api.GetBlocksOptions{}
 	if opts.ToUriQuery() != "" {
 		t.Error("Should be empty, is", opts.ToUriQuery())
 	}
 
-	opts = flashbotsapi.GetBlocksOptions{BlockNumber: 123}
+	opts = api.GetBlocksOptions{BlockNumber: 123}
 	if opts.ToUriQuery() != "?block_number=123" {
 		t.Error("Wrong ToUriQuery:", opts, opts.ToUriQuery())
 	}
 
-	opts = flashbotsapi.GetBlocksOptions{BlockNumber: 123, Miner: "xxx"}
+	opts = api.GetBlocksOptions{BlockNumber: 123, Miner: "xxx"}
 	if opts.ToUriQuery() != "?block_number=123&miner=xxx" {
 		t.Error("Wrong ToUriQuery:", opts, opts.ToUriQuery())
 	}
 
-	opts = flashbotsapi.GetBlocksOptions{BlockNumber: 12527162}
-	block, err := flashbotsapi.GetBlocks(&opts)
+	opts = api.GetBlocksOptions{BlockNumber: 12527162}
+	block, err := api.GetBlocks(&opts)
 	if err != nil {
 		t.Error(err)
 	}
@@ -44,13 +44,13 @@ func TestBlocksApi(t *testing.T) {
 }
 
 func TestTransactionsApi(t *testing.T) {
-	opts := flashbotsapi.GetTransactionsOptions{}
+	opts := api.GetTransactionsOptions{}
 	if opts.ToUriQuery() != "" {
 		t.Error("Should be empty, is", opts.ToUriQuery())
 	}
 
 	// opts = GetTransactionsOptions{}
-	txs, err := flashbotsapi.GetTransactions(nil)
+	txs, err := api.GetTransactions(nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -59,7 +59,7 @@ func TestTransactionsApi(t *testing.T) {
 		t.Error("Wrong amount of tx:", len(txs.Transactions))
 	}
 
-	txs, err = flashbotsapi.GetTransactions(&flashbotsapi.GetTransactionsOptions{Limit: 5})
+	txs, err = api.GetTransactions(&api.GetTransactionsOptions{Limit: 5})
 	if err != nil {
 		t.Error(err)
 	}

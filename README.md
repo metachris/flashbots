@@ -1,6 +1,6 @@
 # Utilities for [Flashbots](https://github.com/flashbots/pm)
 
-* Go API client for the [Flashbots blocks API](https://blocks.flashbots.net/): [`flashbotsapi`](https://github.com/metachris/flashbots-failed-tx/tree/master/flashbotsapi)
+* Go API client for the [Flashbots blocks API](https://blocks.flashbots.net/): [`api`](https://github.com/metachris/flashbots/tree/master/api)
 * Tool to detect failed Flashbots as well as other 0-gas transactions (can run over history or in 'watch' mode, webserver that serves recent detections)
 
 Uses:
@@ -22,18 +22,18 @@ https://blocks.flashbots.net/
 Installation:
 
 ```bash
-go get github.com/metachris/flashbots-failed-tx/flashbotsapi
+go get github.com/metachris/flashbots/api
 ```
 
 Usage:
 
 ```go
 // Blocks API: default
-block, err := flashbotsapi.GetBlocks(nil)
+block, err := api.GetBlocks(nil)
 
 // Blocks API: options
-opts := flashbotsapi.GetBlocksOptions{BlockNumber: 12527162}
-block, err := flashbotsapi.GetBlocks(&opts)
+opts := api.GetBlocksOptions{BlockNumber: 12527162}
+block, err := api.GetBlocks(&opts)
 
 
 // Transactions API: default
@@ -86,7 +86,7 @@ go build -o flashbots-failed-tx cmd/flashbots-failed-tx/main.go
 You can install this tool as `flashbots-failed-tx` binary without cloning the repository:
 
 ```bash
-go install github.com/metachris/flashbots-failed-tx/cmd/flashbots-failed-tx@master
+go install github.com/metachris/flashbots/cmd/flashbots-failed-tx@master
 flashbots-failed-tx -h
 ```
 

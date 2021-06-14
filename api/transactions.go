@@ -1,4 +1,4 @@
-package flashbotsapi
+package api
 
 import (
 	"encoding/json"
