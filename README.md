@@ -92,7 +92,7 @@ flashbots-failed-tx -h
 
 ## Various
 
-![Screenshot](https://user-images.githubusercontent.com/116939/120549797-532fa500-c3f4-11eb-84fc-1e02d1db4cd6.png)
+![Screenshot](https://user-images.githubusercontent.com/116939/121942680-0d0e0600-cd51-11eb-95f0-a0686842f7c2.png)
 
 Interesting blocks:
 
