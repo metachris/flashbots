@@ -1,6 +1,6 @@
 # Utilities for [Flashbots](https://github.com/flashbots/pm)
 
-* Go API client for the [Flashbots blocks API](https://blocks.flashbots.net/): [`api`](https://github.com/metachris/flashbots/tree/master/api)
+* Go API client for the [mev-blocks API](https://blocks.flashbots.net/) for information about Flashbots blocks and transactions
 * Tool to detect failed Flashbots as well as other 0-gas transactions (can run over history or in 'watch' mode, webserver that serves recent detections)
 
 Uses:
