@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/metachris/flashbots-failed-tx/failedtx"
 	"github.com/metachris/flashbots-failed-tx/flashbotsapi"
+	"github.com/metachris/flashbots-failed-tx/flashbotsutils"
 	"github.com/metachris/go-ethutils/blockswithtx"
 	"github.com/metachris/go-ethutils/utils"
 )
@@ -121,7 +122,8 @@ func watch(client *ethclient.Client) {
 			BlockBacklog[header.Number.Int64()] = b
 
 			// Query flashbots API to get latest block it has processed
-			flashbotsResponse, err := flashbotsapi.GetFlashbotsBlock(flashbotsapi.BlockApiOptions{BlockNumber: header.Number.Int64()})
+			opts := flashbotsapi.GetBlockOptions{BlockNumber: header.Number.Int64()}
+			flashbotsResponse, err := flashbotsapi.GetBlocks(&opts)
 			if err != nil {
 				log.Println("error:", err)
 				continue
@@ -152,7 +154,7 @@ func watch(client *ethclient.Client) {
 // Cache for last Flashbots API call (avoids calling multiple times per block)
 type FlashbotsApiReqRes struct {
 	RequestBlock int64
-	Response     flashbotsapi.FlashbotsBlockApiResponse
+	Response     flashbotsapi.BlocksResponse
 }
 
 func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []failedtx.FailedTx) {
@@ -183,12 +185,12 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []failedtx.Failed
 
 				// Either the Flashbots API response is already cached, or we do the API call now
 				if flashbotsApiResponseCache.RequestBlock == b.Block.Number().Int64() {
-					isFlashbotsTx = flashbotsApiResponseCache.Response.IsFlashbotsTx(tx.Hash().String())
+					isFlashbotsTx = flashbotsApiResponseCache.Response.HasTx(tx.Hash().String())
 
 				} else {
-					var response flashbotsapi.FlashbotsBlockApiResponse
+					var response flashbotsapi.BlocksResponse
 					var err error
-					isFlashbotsTx, response, err = flashbotsapi.IsFlashbotsTx(b.Block, tx)
+					isFlashbotsTx, response, err = flashbotsutils.IsFlashbotsTx(b.Block, tx)
 					if err != nil {
 						log.Println("Error:", err)
 						return failedTx

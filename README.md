@@ -1,6 +1,6 @@
 # Utilities for [Flashbots](https://github.com/flashbots/pm)
 
-* Go API client for the [Flashbots blocks API](https://blocks.flashbots.net/): [`flashbotsapi/flashbotsapi.go`](https://github.com/metachris/flashbots-failed-tx/blob/master/flashbotsapi/flashbotsapi.go)
+* Go API client for the [Flashbots blocks API](https://blocks.flashbots.net/): [`flashbotsapi`](https://github.com/metachris/flashbots-failed-tx/tree/master/flashbotsapi)
 * Tool to detect failed Flashbots as well as other 0-gas transactions (can run over history or in 'watch' mode, webserver that serves recent detections)
 
 Uses:
@@ -11,6 +11,34 @@ Uses:
 Notes:
 
 * You should use IPC connections to the geth node, as there are a lot of API calls (one for each tx).
+* PRs and contributions are welcome :)
+
+---
+
+## Flashbots Blocks & Transactions API
+
+https://blocks.flashbots.net/
+
+Installation:
+
+```bash
+go get github.com/metachris/flashbots-failed-tx/flashbotsapi
+```
+
+Usage:
+
+```go
+// Blocks API: default
+block, err := flashbotsapi.GetBlocks(nil)
+
+// Blocks API: options
+opts := flashbotsapi.GetBlocksOptions{BlockNumber: 12527162}
+block, err := flashbotsapi.GetBlocks(&opts)
+
+
+// Transactions API: default
+txs, err := GetTransactions(nil)
+```
 
 ---
 
