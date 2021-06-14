@@ -21,11 +21,11 @@ import (
 	"github.com/metachris/go-ethutils/utils"
 )
 
-const WebserverAddr string = ":6067"
-
 var silent bool
 
 func main() {
+	log.SetOutput(os.Stdout)
+
 	ethUri := flag.String("eth", os.Getenv("ETH_NODE"), "Ethereum node URI")
 	blockHeightPtr := flag.Int("block", 0, "specific block to check")
 	datePtr := flag.String("date", "", "date (yyyy-mm-dd or -1d)")
@@ -34,6 +34,7 @@ func main() {
 	lenPtr := flag.String("len", "", "num blocks or timespan (4s, 5m, 1h, ...)")
 	watchPtr := flag.Bool("watch", false, "watch and process new blocks")
 	silentPtr := flag.Bool("silent", false, "don't print info about every block")
+	webserverPtr := flag.String("webserver", ":6067", "don't print info about every block")
 	flag.Parse()
 
 	if *ethUri == "" {
@@ -52,7 +53,7 @@ func main() {
 		utils.Perror(err)
 		checkBlockRange(client, startBlock, endBlock)
 	} else if *watchPtr {
-		watch(client)
+		watch(client, *webserverPtr)
 	} else {
 		fmt.Println("Nothing to do, check the help with -h.")
 	}
@@ -93,7 +94,7 @@ var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*b
 // FailedTxHistory is used to serve the most recent failed tx via the webserver
 var FailedTxHistory []failedtx.BlockWithFailedTx = make([]failedtx.BlockWithFailedTx, 0, 100)
 
-func watch(client *ethclient.Client) {
+func watch(client *ethclient.Client, webserverAddr string) {
 	headers := make(chan *types.Header)
 	sub, err := client.SubscribeNewHead(context.Background(), headers)
 	if err != nil {
@@ -103,7 +104,7 @@ func watch(client *ethclient.Client) {
 	// Start the webserver
 	go func() {
 		http.HandleFunc("/failedTx", failedTxHistoryHandler)
-		log.Fatal(http.ListenAndServe(WebserverAddr, nil))
+		log.Fatal(http.ListenAndServe(webserverAddr, nil))
 	}()
 
 	for {
@@ -122,7 +123,7 @@ func watch(client *ethclient.Client) {
 			BlockBacklog[header.Number.Int64()] = b
 
 			// Query flashbots API to get latest block it has processed
-			opts := flashbotsapi.GetBlockOptions{BlockNumber: header.Number.Int64()}
+			opts := flashbotsapi.GetBlocksOptions{BlockNumber: header.Number.Int64()}
 			flashbotsResponse, err := flashbotsapi.GetBlocks(&opts)
 			if err != nil {
 				log.Println("error:", err)
@@ -154,7 +155,7 @@ func watch(client *ethclient.Client) {
 // Cache for last Flashbots API call (avoids calling multiple times per block)
 type FlashbotsApiReqRes struct {
 	RequestBlock int64
-	Response     flashbotsapi.BlocksResponse
+	Response     flashbotsapi.GetBlocksResponse
 }
 
 func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []failedtx.FailedTx) {
@@ -188,7 +189,7 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []failedtx.Failed
 					isFlashbotsTx = flashbotsApiResponseCache.Response.HasTx(tx.Hash().String())
 
 				} else {
-					var response flashbotsapi.BlocksResponse
+					var response flashbotsapi.GetBlocksResponse
 					var err error
 					isFlashbotsTx, response, err = flashbotsutils.IsFlashbotsTx(b.Block, tx)
 					if err != nil {

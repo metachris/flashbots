@@ -44,12 +44,12 @@ txs, err := GetTransactions(nil)
 
 ## Detecting 0-gas and Flashbots failed transactions
 
-There's a Telegram bot which publishes the latest of those failed transactions: https://t.me/FlashbotsBot ([GitHub](https://github.com/metachris/flashbots-tx-telegram-bot))
 
 Notes:
 
 * You should use an IPC connection to the geth node, as there are a lot of API calls (one for each tx).
-
+* There's a Telegram bot which publishes the latest of those failed transactions: https://t.me/FlashbotsBot ([GitHub](https://github.com/metachris/flashbots-tx-telegram-bot))
+* In watch mode, a webserver is serving the latest failed 0-gas & flashbots transactions on port 6067
 
 ### Getting started
 
@@ -58,6 +58,9 @@ Set the geth node URI as environment variable `ETH_NODE`, or pass it in as `-eth
 ```bash
 # Build
 go build -o flashbots-failed-tx cmd/flashbots-failed-tx/main.go
+
+# Get a list of all arguments
+./flashbots-failed-tx -help
 
 # Subscribe to new blocks and find failed Flashbots tx:
 ./flashbots-failed-tx -watch
