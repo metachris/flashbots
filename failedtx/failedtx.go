@@ -1,4 +1,5 @@
-package flashbotsfailedtx
+// Representation of a failed Flashbots or other 0-gas transaction (used in webserver)
+package failedtx
 
 // FailedTx contains information about a failed 0-gas or Flashbots tx
 type FailedTx struct {

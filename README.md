@@ -1,22 +1,31 @@
-# Failed Flashbots / 0-Gas Transactions
+# Utilities for [Flashbots](https://github.com/flashbots/pm)
 
-Tool to spot failed [Flashbots](https://github.com/flashbots/pm) and 0-gas transactions.
+* Go API client for the [Flashbots blocks API](https://blocks.flashbots.net/): [`flashbotsapi/flashbotsapi.go`](https://github.com/metachris/flashbots-failed-tx/blob/master/flashbotsapi/flashbotsapi.go)
+* Tool to detect failed Flashbots as well as other 0-gas transactions (can run over history or in 'watch' mode, webserver that serves recent detections)
 
-Telegram bot which publishes the latest of those failed transactions:
+Uses:
 
-* https://t.me/FlashbotsBot
-* https://github.com/metachris/flashbots-tx-telegram-bot
-
----
-
-This tool uses https://github.com/metachris/go-ethutils
+* https://github.com/metachris/go-ethutils
+* https://github.com/ethereum/go-ethereum
 
 Notes:
 
-* You can set the geth node URI as environment variable `ETH_NODE`, or pass it in as `-eth` argument.
+* You should use IPC connections to the geth node, as there are a lot of API calls (one for each tx).
+
+---
+
+## Detecting 0-gas and Flashbots failed transactions
+
+There's a Telegram bot which publishes the latest of those failed transactions: https://t.me/FlashbotsBot ([GitHub](https://github.com/metachris/flashbots-tx-telegram-bot))
+
+Notes:
+
 * You should use an IPC connection to the geth node, as there are a lot of API calls (one for each tx).
 
-## Getting started
+
+### Getting started
+
+Set the geth node URI as environment variable `ETH_NODE`, or pass it in as `-eth` argument.
 
 ```bash
 # Build
@@ -36,12 +45,12 @@ go build -o flashbots-failed-tx cmd/flashbots-failed-tx/main.go
 ./flashbots-failed-tx -block 12539827 -len 1d -silent  # don't print information for every block
 
 # Historic, using a starting date
-./flashbots-failed-tx -date -1d -len 1h         # all blocks within 1 hour of yesterday 00:00:00 (UTC)
 ./flashbots-failed-tx -date 2021-05-31 -len 1d  # all blocks from this day (00:00:00 -> 23:59:59 UTC)
 ./flashbots-failed-tx -date 2021-05-31 -hour 3 -min 53 -len 5m  # all blocks within 1 hour of given date and time (UTC)
+./flashbots-failed-tx -date -1d -len 1h         # all blocks within 1 hour of yesterday 00:00:00 (UTC)
 ```
 
-## Installing without cloning the repo
+### Installing`flashbots-failed-tx` without cloning the repo
 
 You can install this tool as `flashbots-failed-tx` binary without cloning the repository:
 
@@ -59,6 +68,8 @@ Interesting blocks:
 * `12539827` - 1 failed 0-gas tx
 * `12590513` - ~100 failed 0-gas tx
 * `12527162` - failed Flashbots tx
+
+---
 
 ## Feedback
 

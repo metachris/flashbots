@@ -1,4 +1,5 @@
-package flashbotsfailedtx
+// Client for [Flashbots mev-blocks API](https://blocks.flashbots.net/)
+package flashbotsapi
 
 import (
 	"encoding/json"
@@ -13,17 +14,9 @@ var (
 	ErrFlashbotsApiDoesntHaveThatBlockYet = errors.New("flashbots API latest height < requested block height")
 )
 
-type FlashbotsApiTransaction struct {
-	Hash             string `json:"transaction_hash"`
-	TxIndex          int64  `json:"tx_index"`
-	BundleIndex      int64  `json:"bundle_index"`
-	BlockNumber      int64  `json:"block_number"`
-	EoaAddress       string `json:"eoa_address"`
-	ToAddress        string `json:"to_address"`
-	GasUsed          int64  `json:"gas_used"`
-	GasPrice         string `json:"gas_price"`
-	CoinbaseTransfer string `json:"coinbase_transfer"`
-	TotalMinerReward string `json:"total_miner_reward"`
+type FlashbotsBlockApiResponse struct {
+	LatestBlockNumber int64               `json:"latest_block_number"`
+	Blocks            []FlashbotsApiBlock `json:"blocks"`
 }
 
 type FlashbotsApiBlock struct {
@@ -37,9 +30,17 @@ type FlashbotsApiBlock struct {
 	Transactions []FlashbotsApiTransaction `json:"transactions"`
 }
 
-type FlashbotsBlockApiResponse struct {
-	LatestBlockNumber int64               `json:"latest_block_number"`
-	Blocks            []FlashbotsApiBlock `json:"blocks"`
+type FlashbotsApiTransaction struct {
+	Hash             string `json:"transaction_hash"`
+	TxIndex          int64  `json:"tx_index"`
+	BundleIndex      int64  `json:"bundle_index"`
+	BlockNumber      int64  `json:"block_number"`
+	EoaAddress       string `json:"eoa_address"`
+	ToAddress        string `json:"to_address"`
+	GasUsed          int64  `json:"gas_used"`
+	GasPrice         string `json:"gas_price"`
+	CoinbaseTransfer string `json:"coinbase_transfer"`
+	TotalMinerReward string `json:"total_miner_reward"`
 }
 
 func (r *FlashbotsBlockApiResponse) GetTxMap() map[string]FlashbotsApiTransaction {
@@ -80,7 +81,7 @@ func IsFlashbotsTx(block *types.Block, tx *types.Transaction) (isFlashbotsTx boo
 		return isFlashbotsTx, response, err
 	}
 
-	if flashbotsResponse.LatestBlockNumber < block.Number().Int64() {
+	if flashbotsResponse.LatestBlockNumber < block.Number().Int64() { // block is not yet processed by Flashbots
 		return isFlashbotsTx, response, ErrFlashbotsApiDoesntHaveThatBlockYet
 	}
 

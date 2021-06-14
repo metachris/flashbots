@@ -14,7 +14,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	flashbotsfailedtx "github.com/metachris/flashbots-failed-tx"
+	"github.com/metachris/flashbots-failed-tx/failedtx"
+	"github.com/metachris/flashbots-failed-tx/flashbotsapi"
 	"github.com/metachris/go-ethutils/blockswithtx"
 	"github.com/metachris/go-ethutils/utils"
 )
@@ -89,7 +90,7 @@ func checkBlockRange(client *ethclient.Client, startHeight int64, endHeight int6
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
 
 // FailedTxHistory is used to serve the most recent failed tx via the webserver
-var FailedTxHistory []flashbotsfailedtx.BlockWithFailedTx = make([]flashbotsfailedtx.BlockWithFailedTx, 0, 100)
+var FailedTxHistory []failedtx.BlockWithFailedTx = make([]failedtx.BlockWithFailedTx, 0, 100)
 
 func watch(client *ethclient.Client) {
 	headers := make(chan *types.Header)
@@ -120,7 +121,7 @@ func watch(client *ethclient.Client) {
 			BlockBacklog[header.Number.Int64()] = b
 
 			// Query flashbots API to get latest block it has processed
-			flashbotsResponse, err := flashbotsfailedtx.GetFlashbotsBlock(header.Number.Int64())
+			flashbotsResponse, err := flashbotsapi.GetFlashbotsBlock(header.Number.Int64())
 			if err != nil {
 				log.Println("error:", err)
 				continue
@@ -134,7 +135,7 @@ func watch(client *ethclient.Client) {
 
 					if len(txs) > 0 {
 						// Append failed 0-gas/flashbots tx to history
-						FailedTxHistory = append(FailedTxHistory, flashbotsfailedtx.BlockWithFailedTx{
+						FailedTxHistory = append(FailedTxHistory, failedtx.BlockWithFailedTx{
 							BlockHeight: backlogBlock.Block.Number().Int64(),
 							FailedTx:    txs,
 						})
@@ -148,14 +149,14 @@ func watch(client *ethclient.Client) {
 	}
 }
 
-// Helper to keep the last Flashbots API call and response, to avoid calling multiple times per block
+// Cache for last Flashbots API call (avoids calling multiple times per block)
 type FlashbotsApiReqRes struct {
 	RequestBlock int64
-	Response     flashbotsfailedtx.FlashbotsBlockApiResponse
+	Response     flashbotsapi.FlashbotsBlockApiResponse
 }
 
-func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []flashbotsfailedtx.FailedTx) {
-	failedTx = make([]flashbotsfailedtx.FailedTx, 0)
+func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []failedtx.FailedTx) {
+	failedTx = make([]failedtx.FailedTx, 0)
 
 	if !silent {
 		utils.PrintBlock(b.Block)
@@ -185,9 +186,9 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []flashbotsfailed
 					isFlashbotsTx = flashbotsApiResponseCache.Response.IsFlashbotsTx(tx.Hash().String())
 
 				} else {
-					var response flashbotsfailedtx.FlashbotsBlockApiResponse
+					var response flashbotsapi.FlashbotsBlockApiResponse
 					var err error
-					isFlashbotsTx, response, err = flashbotsfailedtx.IsFlashbotsTx(b.Block, tx)
+					isFlashbotsTx, response, err = flashbotsapi.IsFlashbotsTx(b.Block, tx)
 					if err != nil {
 						log.Println("Error:", err)
 						return failedTx
@@ -197,12 +198,12 @@ func checkBlock(b *blockswithtx.BlockWithTxReceipts) (failedTx []flashbotsfailed
 					flashbotsApiResponseCache.Response = response
 				}
 
-				// Remember the failed tx
+				// Create a FailedTx instance for this transaction
 				var to string
 				if tx.To() != nil {
 					to = tx.To().String()
 				}
-				failedTx = append(failedTx, flashbotsfailedtx.FailedTx{
+				failedTx = append(failedTx, failedtx.FailedTx{
 					Hash:        tx.Hash().String(),
 					From:        sender.String(),
 					To:          to,
