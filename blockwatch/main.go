@@ -121,7 +121,7 @@ func CheckBlock(block api.FlashbotsBlock) *Block {
 		bundle := bundles[int64(i)]
 		// if not first bundle, and value larger than from last bundle, print the error
 		if lastCoinbaseDivGasused.Int64() != 0 && bundle.CoinbaseDivGasUsed.Cmp(lastCoinbaseDivGasused) == 1 && bundle.RewardDivGasUsed.Cmp(lastRewardDivGasused) == 1 {
-			msg := fmt.Sprintf("- order error: bundle %d pays more but comes after lower effective-gas-price\n", bundle.Index)
+			msg := fmt.Sprintf("- order error: bundle %d pays more but comes after lower price\n", bundle.Index)
 			b.Errors = append(b.Errors, msg)
 		}
 

@@ -103,23 +103,32 @@ func watch(ethUri, webserverAddr string) {
 					}
 
 					// checkBlockForFailedTx(blockFromBacklog)
-					CheckBlockForBundleOrderErrors(blockFromBacklog)
+					checkComplete := CheckBlockForBundleOrderErrors(blockFromBacklog)
+
+					// Success, remove from backlog
+					if checkComplete {
+						delete(BlockBacklog, b.Block.Number().Int64())
+					}
 				}
 			}
 		}
 	}
 }
 
-func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) {
-	fmt.Println("checkBlockForBundleOrderErrors", block.Block.Number())
+//
+// BUNDLE ORDER
+//
+func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) (checkComplete bool) {
+	// fmt.Println("checkBlockForBundleOrderErrors", block.Block.Number())
 	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: block.Block.Number().Int64()})
 	if err != nil {
 		log.Println(err)
-		return
+		return false
 	}
 
 	if len(flashbotsBlocks.Blocks) != 1 {
 		log.Println("error fetching flashbots blocks. expected 1, got", len(flashbotsBlocks.Blocks))
+		return false
 	}
 
 	b := blockwatch.CheckBlock(flashbotsBlocks.Blocks[0])
@@ -128,8 +137,35 @@ func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) {
 
 		// push to discord
 	}
+	return true
 }
 
+func CheckRecentBundles() {
+	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 1000})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%d blocks\n", len(blocks.Blocks))
+
+	// Sort by blockheight, to iterate in ascending order
+	sort.SliceStable(blocks.Blocks, func(i, j int) bool {
+		return blocks.Blocks[i].BlockNumber < blocks.Blocks[j].BlockNumber
+	})
+
+	// Check each block
+	for _, block := range blocks.Blocks {
+		b := blockwatch.CheckBlock(block)
+		if b.HasErrors() {
+			blockwatch.PrintBlock(b)
+			fmt.Println("")
+		}
+	}
+}
+
+//
+// FAILED TX
+//
 func CheckBlockForFailedTx(block *blockswithtx.BlockWithTxReceipts) {
 	txs := _checkBlockForFailedTx(block)
 
@@ -213,34 +249,10 @@ func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTx []fai
 		}
 	}
 
-	delete(BlockBacklog, b.Block.Number().Int64())
 	return failedTx
 }
 
 func failedTxHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(FailedTxHistory)
-}
-
-func CheckRecentBundles() {
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 1000})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("%d blocks\n", len(blocks.Blocks))
-
-	// Sort by blockheight, to iterate in ascending order
-	sort.SliceStable(blocks.Blocks, func(i, j int) bool {
-		return blocks.Blocks[i].BlockNumber < blocks.Blocks[j].BlockNumber
-	})
-
-	// Check each block
-	for _, block := range blocks.Blocks {
-		b := blockwatch.CheckBlock(block)
-		if b.HasErrors() {
-			blockwatch.PrintBlock(b)
-			fmt.Println("")
-		}
-	}
 }
