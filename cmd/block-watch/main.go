@@ -34,12 +34,6 @@ func main() {
 	flag.Parse()
 	silent = *silentPtr
 
-	if *ethUri == "" {
-		log.Fatal("Pass a valid eth node with -eth argument or ETH_NODE env var.")
-	} else if !strings.HasPrefix(*ethUri, "/") {
-		fmt.Printf("Warning: You should use a direct IPC connection to the Ethereum node, else it might be slow to download receipts for all transactions.\n")
-	}
-
 	if *recentBundleOrdersPtr {
 		CheckRecentBundles()
 	}
@@ -56,6 +50,12 @@ var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*b
 var FailedTxHistory []failedtx.BlockWithFailedTx = make([]failedtx.BlockWithFailedTx, 0, 100)
 
 func watch(ethUri, webserverAddr string) {
+	if ethUri == "" {
+		log.Fatal("Pass a valid eth node with -eth argument or ETH_NODE env var.")
+	} else if !strings.HasPrefix(ethUri, "/") {
+		fmt.Printf("Warning: You should use a direct IPC connection to the Ethereum node, else it might be slow to download receipts for all transactions.\n")
+	}
+
 	client, err := ethclient.Dial(ethUri)
 	utils.Perror(err)
 
@@ -99,7 +99,7 @@ func watch(ethUri, webserverAddr string) {
 				if height <= flashbotsResponse.LatestBlockNumber {
 					// Check block
 					if !silent {
-						utils.PrintBlock(b.Block)
+						utils.PrintBlock(blockFromBacklog.Block)
 					}
 
 					// checkBlockForFailedTx(blockFromBacklog)
@@ -107,7 +107,7 @@ func watch(ethUri, webserverAddr string) {
 
 					// Success, remove from backlog
 					if checkComplete {
-						delete(BlockBacklog, b.Block.Number().Int64())
+						delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())
 					}
 				}
 			}
@@ -120,14 +120,18 @@ func watch(ethUri, webserverAddr string) {
 //
 func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) (checkComplete bool) {
 	// fmt.Println("checkBlockForBundleOrderErrors", block.Block.Number())
-	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: block.Block.Number().Int64()})
+	blockNumber := block.Block.Number().Int64()
+	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: blockNumber})
 	if err != nil {
 		log.Println(err)
 		return false
 	}
 
 	if len(flashbotsBlocks.Blocks) != 1 {
-		log.Println("error fetching flashbots blocks. expected 1, got", len(flashbotsBlocks.Blocks))
+		if len(flashbotsBlocks.Blocks) == 0 { // no flashbots tx in this block
+			return true
+		}
+		fmt.Printf("- error fetching flashbots block %d - expected 1 block, got %d\n", blockNumber, len(flashbotsBlocks.Blocks))
 		return false
 	}
 
@@ -141,7 +145,7 @@ func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) (ch
 }
 
 func CheckRecentBundles() {
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 1000})
+	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10000})
 	if err != nil {
 		log.Fatal(err)
 	}
