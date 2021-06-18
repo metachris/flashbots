@@ -36,6 +36,7 @@ func CheckRecent() {
 
 type Block struct {
 	Number  int64
+	Miner   string
 	Bundles []*common.Bundle
 
 	Errors []string
@@ -56,7 +57,7 @@ func (b *Block) HasErrors() bool {
 
 func PrintBlock(b *Block) {
 	// Print block info
-	fmt.Printf("block %d: bundles: %d\n", b.Number, len(b.Bundles))
+	fmt.Printf("block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
 
 	// Print errors
 	for _, err := range b.Errors {
@@ -101,7 +102,7 @@ func CheckBlock(block api.FlashbotsBlock) *Block {
 
 	numBundles := len(bundles)
 
-	b := Block{Number: block.BlockNumber}
+	b := Block{Number: block.BlockNumber, Miner: block.Miner}
 	for _, bundle := range bundles {
 		b.AddBundle(bundle)
 	}

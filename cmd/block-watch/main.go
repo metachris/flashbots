@@ -22,20 +22,29 @@ import (
 )
 
 var silent bool
+var sendToDiscord bool
 
 func main() {
 	log.SetOutput(os.Stdout)
 
 	ethUri := flag.String("eth", os.Getenv("ETH_NODE"), "Ethereum node URI")
 	recentBundleOrdersPtr := flag.Bool("recentBundleOrder", false, "check recent bundle orders blocks")
+	blockHeightPtr := flag.Int64("block", 0, "specific block to check")
 	watchPtr := flag.Bool("watch", false, "watch and process new blocks")
 	silentPtr := flag.Bool("silent", false, "don't print info about every block")
+	discordPtr := flag.Bool("discord", false, "send errors to Discord")
 	webserverPtr := flag.String("webserver", ":6067", "don't print info about every block")
 	flag.Parse()
+
 	silent = *silentPtr
+	sendToDiscord = *discordPtr
 
 	if *recentBundleOrdersPtr {
 		CheckRecentBundles()
+	}
+
+	if *blockHeightPtr > 0 {
+		CheckBlockForBundleOrderErrors(*blockHeightPtr)
 	}
 
 	if *watchPtr {
@@ -103,7 +112,7 @@ func watch(ethUri, webserverAddr string) {
 					}
 
 					// checkBlockForFailedTx(blockFromBacklog)
-					checkComplete := CheckBlockForBundleOrderErrors(blockFromBacklog)
+					checkComplete := CheckBlockForBundleOrderErrors(blockFromBacklog.Block.Number().Int64())
 
 					// Success, remove from backlog
 					if checkComplete {
@@ -115,12 +124,16 @@ func watch(ethUri, webserverAddr string) {
 	}
 }
 
+type DiscordWebhookPayload struct {
+	Content string `json:"content"`
+}
+
 //
 // BUNDLE ORDER
 //
-func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) (checkComplete bool) {
+func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
 	// fmt.Println("checkBlockForBundleOrderErrors", block.Block.Number())
-	blockNumber := block.Block.Number().Int64()
+	// blockNumber := block.Block.Number().Int64()
 	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: blockNumber})
 	if err != nil {
 		log.Println(err)
@@ -138,8 +151,10 @@ func CheckBlockForBundleOrderErrors(block *blockswithtx.BlockWithTxReceipts) (ch
 	b := blockwatch.CheckBlock(flashbotsBlocks.Blocks[0])
 	if b.HasErrors() {
 		blockwatch.PrintBlock(b)
+		fmt.Println("")
 
-		// push to discord
+		// send to Discord
+		SendBlockErrorToDiscord(b)
 	}
 	return true
 }

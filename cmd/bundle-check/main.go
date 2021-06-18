@@ -21,7 +21,7 @@ func main() {
 	blockHeightPtr := flag.Int64("block", 0, "specific block to check")
 	flag.Parse()
 
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 1000, BlockNumber: *blockHeightPtr})
+	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10000, BlockNumber: *blockHeightPtr})
 	if err != nil {
 		log.Fatal(err)
 	}
