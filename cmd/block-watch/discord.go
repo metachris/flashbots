@@ -1,3 +1,5 @@
+// Discord webhook helpers
+// https://discord.com/developers/docs/resources/webhook#execute-webhook
 package main
 
 import (
@@ -8,10 +10,14 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/metachris/flashbots/blockwatch"
+	"github.com/metachris/flashbots/common"
 )
 
-func SendBlockErrorToDiscord(b *blockwatch.Block) (success bool) {
+type DiscordWebhookPayload struct {
+	Content string `json:"content"`
+}
+
+func SendBlockErrorToDiscord(b *common.Block) (success bool) {
 	url := os.Getenv("DISCORD_WEBHOOK")
 	if len(url) == 0 {
 		log.Println("error no DISCORD_WEBHOOK")

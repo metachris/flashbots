@@ -1,8 +1,10 @@
+// Helper to check for correct bundle ordering within blocks
+//
 // MEV bundles MUST be sorted by their bundle adjusted gas price first and then one by one added
 // to the block as long as there is any gas left in the block and the number of bundles added
 // is less or equal the MaxMergedBundles parameter.
 // https://docs.flashbots.net/flashbots-core/miners/mev-geth-spec/v02/#block-construction
-package blockwatch
+package bundleorder
 
 import (
 	"fmt"
@@ -34,28 +36,7 @@ func CheckRecent() {
 	}
 }
 
-type Block struct {
-	Number  int64
-	Miner   string
-	Bundles []*common.Bundle
-
-	Errors []string
-}
-
-func (b *Block) AddBundle(bundle *common.Bundle) {
-	b.Bundles = append(b.Bundles, bundle)
-
-	// Bring bundles into order
-	sort.SliceStable(b.Bundles, func(i, j int) bool {
-		return b.Bundles[i].Index < b.Bundles[j].Index
-	})
-}
-
-func (b *Block) HasErrors() bool {
-	return len(b.Errors) > 0
-}
-
-func PrintBlock(b *Block) {
+func PrintBlock(b *common.Block) {
 	// Print block info
 	fmt.Printf("block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
 
@@ -70,7 +51,7 @@ func PrintBlock(b *Block) {
 	}
 }
 
-func CheckBlock(block api.FlashbotsBlock) *Block {
+func CheckBlock(block api.FlashbotsBlock) *common.Block {
 	// Create the bundles from this block
 	bundles := make(map[int64]*common.Bundle)
 	for _, tx := range block.Transactions {
@@ -102,7 +83,7 @@ func CheckBlock(block api.FlashbotsBlock) *Block {
 
 	numBundles := len(bundles)
 
-	b := Block{Number: block.BlockNumber, Miner: block.Miner}
+	b := common.Block{Number: block.BlockNumber, Miner: block.Miner}
 	for _, bundle := range bundles {
 		b.AddBundle(bundle)
 	}

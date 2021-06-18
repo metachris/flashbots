@@ -1,3 +1,4 @@
+// Watch blocks and check for errors
 package main
 
 import (
@@ -14,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/metachris/flashbots/api"
-	"github.com/metachris/flashbots/blockwatch"
+	"github.com/metachris/flashbots/bundleorder"
 	"github.com/metachris/flashbots/failedtx"
 	"github.com/metachris/flashbots/flashbotsutils"
 	"github.com/metachris/go-ethutils/blockswithtx"
@@ -22,7 +23,7 @@ import (
 )
 
 var silent bool
-var sendToDiscord bool
+var sendErrorsToDiscord bool
 
 func main() {
 	log.SetOutput(os.Stdout)
@@ -37,7 +38,7 @@ func main() {
 	flag.Parse()
 
 	silent = *silentPtr
-	sendToDiscord = *discordPtr
+	sendErrorsToDiscord = *discordPtr
 
 	if *recentBundleOrdersPtr {
 		CheckRecentBundles()
@@ -103,10 +104,9 @@ func watch(ethUri, webserverAddr string) {
 				continue
 			}
 
-			// Process all possible blocks in the backlog
+			// Process all blocks from the backlog which are already processed by the Flashbots API
 			for height, blockFromBacklog := range BlockBacklog {
 				if height <= flashbotsResponse.LatestBlockNumber {
-					// Check block
 					if !silent {
 						utils.PrintBlock(blockFromBacklog.Block)
 					}
@@ -124,16 +124,10 @@ func watch(ethUri, webserverAddr string) {
 	}
 }
 
-type DiscordWebhookPayload struct {
-	Content string `json:"content"`
-}
-
 //
-// BUNDLE ORDER
+// CHECK BUNDLE ORDERING
 //
 func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
-	// fmt.Println("checkBlockForBundleOrderErrors", block.Block.Number())
-	// blockNumber := block.Block.Number().Int64()
 	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: blockNumber})
 	if err != nil {
 		log.Println(err)
@@ -148,19 +142,21 @@ func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
 		return false
 	}
 
-	b := blockwatch.CheckBlock(flashbotsBlocks.Blocks[0])
+	b := bundleorder.CheckBlock(flashbotsBlocks.Blocks[0])
 	if b.HasErrors() {
-		blockwatch.PrintBlock(b)
+		bundleorder.PrintBlock(b)
 		fmt.Println("")
 
 		// send to Discord
-		SendBlockErrorToDiscord(b)
+		if sendErrorsToDiscord {
+			SendBlockErrorToDiscord(b)
+		}
 	}
 	return true
 }
 
 func CheckRecentBundles() {
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10000})
+	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10_000})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -174,9 +170,9 @@ func CheckRecentBundles() {
 
 	// Check each block
 	for _, block := range blocks.Blocks {
-		b := blockwatch.CheckBlock(block)
+		b := bundleorder.CheckBlock(block)
 		if b.HasErrors() {
-			blockwatch.PrintBlock(b)
+			bundleorder.PrintBlock(b)
 			fmt.Println("")
 		}
 	}
@@ -186,13 +182,12 @@ func CheckRecentBundles() {
 // FAILED TX
 //
 func CheckBlockForFailedTx(block *blockswithtx.BlockWithTxReceipts) {
-	txs := _checkBlockForFailedTx(block)
-
-	if len(txs) > 0 {
-		// Append failed 0-gas/flashbots tx to history
+	failedTransactions := _checkBlockForFailedTx(block)
+	if len(failedTransactions) > 0 {
+		// Append to failed-tx history
 		FailedTxHistory = append(FailedTxHistory, failedtx.BlockWithFailedTx{
 			BlockHeight: block.Block.Number().Int64(),
-			FailedTx:    txs,
+			FailedTx:    failedTransactions,
 		})
 		if len(FailedTxHistory) == 100 { // truncate history
 			FailedTxHistory = FailedTxHistory[1:]

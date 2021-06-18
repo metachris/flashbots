@@ -2,6 +2,7 @@ package common
 
 import (
 	"math/big"
+	"sort"
 
 	"github.com/metachris/flashbots/api"
 )
@@ -25,4 +26,25 @@ func NewBundle() *Bundle {
 		CoinbaseDivGasUsed:    new(big.Int),
 		RewardDivGasUsed:      new(big.Int),
 	}
+}
+
+type Block struct {
+	Number  int64
+	Miner   string
+	Bundles []*Bundle
+
+	Errors []string
+}
+
+func (b *Block) AddBundle(bundle *Bundle) {
+	b.Bundles = append(b.Bundles, bundle)
+
+	// Bring bundles into order
+	sort.SliceStable(b.Bundles, func(i, j int) bool {
+		return b.Bundles[i].Index < b.Bundles[j].Index
+	})
+}
+
+func (b *Block) HasErrors() bool {
+	return len(b.Errors) > 0
 }

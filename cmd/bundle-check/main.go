@@ -1,3 +1,5 @@
+// Check bundle ordering
+//
 // MEV bundles MUST be sorted by their bundle adjusted gas price first and then one by one added
 // to the block as long as there is any gas left in the block and the number of bundles added
 // is less or equal the MaxMergedBundles parameter.
@@ -12,7 +14,7 @@ import (
 	"sort"
 
 	"github.com/metachris/flashbots/api"
-	"github.com/metachris/flashbots/blockwatch"
+	"github.com/metachris/flashbots/bundleorder"
 )
 
 func main() {
@@ -21,7 +23,7 @@ func main() {
 	blockHeightPtr := flag.Int64("block", 0, "specific block to check")
 	flag.Parse()
 
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10000, BlockNumber: *blockHeightPtr})
+	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10_000, BlockNumber: *blockHeightPtr})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,9 +37,9 @@ func main() {
 
 	// Check each block
 	for _, block := range blocks.Blocks {
-		b := blockwatch.CheckBlock(block)
+		b := bundleorder.CheckBlock(block)
 		if b.HasErrors() {
-			blockwatch.PrintBlock(b)
+			bundleorder.PrintBlock(b)
 			fmt.Println("")
 		}
 	}
