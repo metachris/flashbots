@@ -5,47 +5,48 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
+	"github.com/metachris/flashbots/bundleorder"
 	"github.com/metachris/flashbots/common"
+	"github.com/metachris/flashbots/failedtx"
 )
 
 type DiscordWebhookPayload struct {
 	Content string `json:"content"`
 }
 
-func SendBlockErrorToDiscord(b *common.Block) (success bool) {
+func SendBundleOrderErrorToDiscord(b *common.Block) error {
+	msg := bundleorder.SprintBlock(b, false)
+	return SendToDiscord("```" + msg + "```")
+}
+
+func SendFailedTxToDiscord(tx failedtx.FailedTx) error {
+	msg := failedtx.MsgForFailedTx(tx)
+	return SendToDiscord(msg)
+}
+
+func SendToDiscord(msg string) error {
 	url := os.Getenv("DISCORD_WEBHOOK")
 	if len(url) == 0 {
-		log.Println("error no DISCORD_WEBHOOK")
-		return false
+		return errors.New("no DISCORD_WEBHOOK env variable found")
 	}
 
-	msg := fmt.Sprintf("block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
-	for _, err := range b.Errors {
-		msg += err
-	}
-	msg += "\n"
-	for _, bundle := range b.Bundles {
-		msg += fmt.Sprintf("- bundle %d: tx=%d, gasUsed=%d \t coinbase_transfer: %18v, total_miner_reward: %18v \t coinbase/gasused: %12v, reward/gasused: %12v \n", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, bundle.TotalCoinbaseTransfer, bundle.TotalMinerReward, bundle.CoinbaseDivGasUsed, bundle.RewardDivGasUsed)
-	}
-	discordPayload := DiscordWebhookPayload{Content: "```" + msg + "```"}
+	discordPayload := DiscordWebhookPayload{Content: msg}
 	payloadBytes, err := json.Marshal(discordPayload)
 	if err != nil {
-		log.Println(err)
-		return false
+		return err
 	}
 
 	res, err := http.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		log.Println(2, err)
-		return false
+		return err
 	}
 
 	defer res.Body.Close()
 	fmt.Println("response Status:", res.Status)
-	return true
+	return nil
 }

@@ -36,19 +36,31 @@ func CheckRecent() {
 	}
 }
 
-func PrintBlock(b *common.Block) {
+func SprintBlock(b *common.Block, color bool) string {
 	// Print block info
-	fmt.Printf("block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
+	msg := fmt.Sprintf("block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
 
 	// Print errors
 	for _, err := range b.Errors {
-		utils.ColorPrintf(utils.WarningColor, err)
+		if color {
+			msg += fmt.Sprintf(utils.WarningColor, err)
+		} else {
+			msg += err
+		}
 	}
 
 	// Print bundles
 	for _, bundle := range b.Bundles {
-		fmt.Printf("- bundle %d: tx=%d, gasUsed=%d \t coinbase_transfer: %18v, total_miner_reward: %18v \t coinbase/gasused: %12v, reward/gasused: %12v \n", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, bundle.TotalCoinbaseTransfer, bundle.TotalMinerReward, bundle.CoinbaseDivGasUsed, bundle.RewardDivGasUsed)
+		percentPart := ""
+		if bundle.PercentPriceDiff.Cmp(big.NewFloat(0)) == -1 {
+			percentPart = fmt.Sprintf("(%6s%%)", bundle.PercentPriceDiff.Text('f', 2))
+		} else if bundle.PercentPriceDiff.Cmp(big.NewFloat(0)) == 1 {
+			percentPart = fmt.Sprintf("(+%5s%%)", bundle.PercentPriceDiff.Text('f', 2))
+		}
+		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %18v, total_miner_reward: %18v \t coinbase/gasused: %13v, reward/gasused: %13v %v \n", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, bundle.TotalCoinbaseTransfer, bundle.TotalMinerReward, bundle.CoinbaseDivGasUsed, bundle.RewardDivGasUsed, percentPart)
 	}
+
+	return msg
 }
 
 func CheckBlock(block api.FlashbotsBlock) *common.Block {
@@ -102,12 +114,26 @@ func CheckBlock(block api.FlashbotsBlock) *common.Block {
 	for i := 0; i < numBundles; i++ {
 		bundle := bundles[int64(i)]
 		// if not first bundle, and value larger than from last bundle, print the error
-		if lastCoinbaseDivGasused.Int64() != 0 &&
-			bundle.CoinbaseDivGasUsed.Cmp(lastCoinbaseDivGasused) == 1 &&
-			bundle.RewardDivGasUsed.Cmp(lastRewardDivGasused) == 1 &&
-			bundle.CoinbaseDivGasUsed.Cmp(lastRewardDivGasused) == 1 {
-			msg := fmt.Sprintf("- order error: bundle %d pays more but comes after lower price\n", bundle.Index)
-			b.Errors = append(b.Errors, msg)
+		if lastCoinbaseDivGasused.Int64() == 0 {
+
+		} else {
+			percentDiff := new(big.Float).Quo(new(big.Float).SetInt(bundle.RewardDivGasUsed), new(big.Float).SetInt(lastRewardDivGasused))
+			percentDiff = new(big.Float).Sub(percentDiff, big.NewFloat(1))
+			percentDiff = new(big.Float).Mul(percentDiff, big.NewFloat(100))
+			bundle.PercentPriceDiff = percentDiff
+
+			if lastCoinbaseDivGasused.Int64() != 0 &&
+				bundle.CoinbaseDivGasUsed.Cmp(lastCoinbaseDivGasused) == 1 &&
+				bundle.RewardDivGasUsed.Cmp(lastRewardDivGasused) == 1 &&
+				bundle.CoinbaseDivGasUsed.Cmp(lastRewardDivGasused) == 1 {
+
+				msg := fmt.Sprintf("- order error: bundle %d pays %v%s more than previous bundle\n", bundle.Index, percentDiff.Text('f', 2), "%%")
+				b.Errors = append(b.Errors, msg)
+				diffFloat, _ := percentDiff.Float32()
+				if diffFloat > b.BiggestBundlePercentPriceDiff {
+					b.BiggestBundlePercentPriceDiff = diffFloat
+				}
+			}
 		}
 
 		lastCoinbaseDivGasused = bundle.CoinbaseDivGasUsed

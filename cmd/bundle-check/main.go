@@ -39,7 +39,7 @@ func main() {
 	for _, block := range blocks.Blocks {
 		b := bundleorder.CheckBlock(block)
 		if b.HasErrors() {
-			bundleorder.PrintBlock(b)
+			fmt.Println(bundleorder.SprintBlock(b, true))
 			fmt.Println("")
 		}
 	}

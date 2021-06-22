@@ -25,6 +25,10 @@ import (
 var silent bool
 var sendErrorsToDiscord bool
 
+const BundlePercentPriceDiffThreshold float32 = 50
+
+// var webserverAddr string
+
 func main() {
 	log.SetOutput(os.Stdout)
 
@@ -34,11 +38,17 @@ func main() {
 	watchPtr := flag.Bool("watch", false, "watch and process new blocks")
 	silentPtr := flag.Bool("silent", false, "don't print info about every block")
 	discordPtr := flag.Bool("discord", false, "send errors to Discord")
-	webserverPtr := flag.String("webserver", ":6067", "don't print info about every block")
+	webserverPtr := flag.String("webserver", ":6069", "run webserver on this port")
 	flag.Parse()
 
 	silent = *silentPtr
-	sendErrorsToDiscord = *discordPtr
+
+	if *discordPtr {
+		if len(os.Getenv("DISCORD_WEBHOOK")) == 0 {
+			log.Fatal("No DISCORD_WEBHOOK environment variable found!")
+		}
+		sendErrorsToDiscord = *discordPtr
+	}
 
 	if *recentBundleOrdersPtr {
 		CheckRecentBundles()
@@ -111,11 +121,11 @@ func watch(ethUri, webserverAddr string) {
 						utils.PrintBlock(blockFromBacklog.Block)
 					}
 
-					// checkBlockForFailedTx(blockFromBacklog)
-					checkComplete := CheckBlockForBundleOrderErrors(blockFromBacklog.Block.Number().Int64())
+					CheckBlockForFailedTx(blockFromBacklog)
+					checkBundleOrderDone := CheckBlockForBundleOrderErrors(blockFromBacklog.Block.Number().Int64())
 
 					// Success, remove from backlog
-					if checkComplete {
+					if checkBundleOrderDone {
 						delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())
 					}
 				}
@@ -144,12 +154,16 @@ func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
 
 	b := bundleorder.CheckBlock(flashbotsBlocks.Blocks[0])
 	if b.HasErrors() {
-		bundleorder.PrintBlock(b)
+		msg := bundleorder.SprintBlock(b, true)
+		fmt.Println(msg)
 		fmt.Println("")
 
 		// send to Discord
-		if sendErrorsToDiscord {
-			SendBlockErrorToDiscord(b)
+		if sendErrorsToDiscord && b.BiggestBundlePercentPriceDiff > BundlePercentPriceDiffThreshold {
+			err := SendBundleOrderErrorToDiscord(b)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 	return true
@@ -172,7 +186,8 @@ func CheckRecentBundles() {
 	for _, block := range blocks.Blocks {
 		b := bundleorder.CheckBlock(block)
 		if b.HasErrors() {
-			bundleorder.PrintBlock(b)
+			msg := bundleorder.SprintBlock(b, true)
+			fmt.Println(msg)
 			fmt.Println("")
 		}
 	}

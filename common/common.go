@@ -16,6 +16,8 @@ type Bundle struct {
 
 	CoinbaseDivGasUsed *big.Int
 	RewardDivGasUsed   *big.Int
+
+	PercentPriceDiff *big.Float // on order error, % difference to previous bundle
 }
 
 func NewBundle() *Bundle {
@@ -25,6 +27,7 @@ func NewBundle() *Bundle {
 		TotalGasUsed:          new(big.Int),
 		CoinbaseDivGasUsed:    new(big.Int),
 		RewardDivGasUsed:      new(big.Int),
+		PercentPriceDiff:      new(big.Float),
 	}
 }
 
@@ -33,7 +36,8 @@ type Block struct {
 	Miner   string
 	Bundles []*Bundle
 
-	Errors []string
+	Errors                        []string
+	BiggestBundlePercentPriceDiff float32 // on order error, % difference to previous bundle
 }
 
 func (b *Block) AddBundle(bundle *Bundle) {
