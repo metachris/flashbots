@@ -4,7 +4,7 @@ import "math/big"
 
 func BigFloatToEString(f *big.Float, prec int) string {
 	s1 := f.Text('f', 0)
-	if len(s1) > 16 {
+	if len(s1) >= 16 {
 		f2 := new(big.Float).Quo(f, big.NewFloat(1e18))
 		s := f2.Text('f', prec)
 		return s + "e+18"

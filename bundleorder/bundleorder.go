@@ -36,9 +36,13 @@ func CheckRecent() {
 	}
 }
 
-func SprintBlock(b *common.Block, color bool) string {
+func SprintBlock(b *common.Block, color bool, markdown bool) (msg string) {
 	// Print block info
-	msg := fmt.Sprintf("block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
+	if markdown {
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) - miner: [%s][<https://etherscan.io/address/%s>]), bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.Bundles))
+	} else {
+		msg = fmt.Sprintf("Block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
+	}
 
 	// Print errors
 	for _, err := range b.Errors {
@@ -51,6 +55,7 @@ func SprintBlock(b *common.Block, color bool) string {
 
 	// Print bundles
 	for _, bundle := range b.Bundles {
+		// Build string for percent(gasprice difference to previous bundle)
 		percentPart := ""
 		if bundle.PercentPriceDiff.Cmp(big.NewFloat(0)) == -1 {
 			percentPart = fmt.Sprintf("(%6s%%)", bundle.PercentPriceDiff.Text('f', 2))
@@ -58,7 +63,11 @@ func SprintBlock(b *common.Block, color bool) string {
 			percentPart = fmt.Sprintf("(+%5s%%)", bundle.PercentPriceDiff.Text('f', 2))
 		}
 
-		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %11v, total_miner_reward: %11v \t coinbase/gasused: %13v, reward/gasused: %13v %v \n", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, common.BigIntToEString(bundle.TotalCoinbaseTransfer, 4), common.BigIntToEString(bundle.TotalMinerReward, 4), common.BigIntToEString(bundle.CoinbaseDivGasUsed, 4), common.BigIntToEString(bundle.RewardDivGasUsed, 4), percentPart)
+		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %11v, total_miner_reward: %11v \t coinbase/gasused: %13v, reward/gasused: %13v %v", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, common.BigIntToEString(bundle.TotalCoinbaseTransfer, 4), common.BigIntToEString(bundle.TotalMinerReward, 4), common.BigIntToEString(bundle.CoinbaseDivGasUsed, 4), common.BigIntToEString(bundle.RewardDivGasUsed, 4), percentPart)
+		if bundle.IsOutOfOrder {
+			msg += " <--- out_of_order"
+		}
+		msg += "\n"
 	}
 
 	return msg
@@ -128,8 +137,9 @@ func CheckBlock(block api.FlashbotsBlock) *common.Block {
 				bundle.RewardDivGasUsed.Cmp(lastRewardDivGasused) == 1 &&
 				bundle.CoinbaseDivGasUsed.Cmp(lastRewardDivGasused) == 1 {
 
-				msg := fmt.Sprintf("- order error: bundle %d pays %v%s more than previous bundle\n", bundle.Index, percentDiff.Text('f', 2), "%%")
+				msg := fmt.Sprintf("- order error: bundle %d pays %v%% more than previous bundle\n", bundle.Index, percentDiff.Text('f', 2))
 				b.Errors = append(b.Errors, msg)
+				bundle.IsOutOfOrder = true
 				diffFloat, _ := percentDiff.Float32()
 				if diffFloat > b.BiggestBundlePercentPriceDiff {
 					b.BiggestBundlePercentPriceDiff = diffFloat

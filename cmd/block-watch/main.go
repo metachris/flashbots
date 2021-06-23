@@ -154,7 +154,7 @@ func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
 
 	b := bundleorder.CheckBlock(flashbotsBlocks.Blocks[0])
 	if b.HasErrors() {
-		msg := bundleorder.SprintBlock(b, true)
+		msg := bundleorder.SprintBlock(b, true, false)
 		fmt.Println(msg)
 		fmt.Println("")
 
@@ -186,7 +186,7 @@ func CheckRecentBundles() {
 	for _, block := range blocks.Blocks {
 		b := bundleorder.CheckBlock(block)
 		if b.HasErrors() {
-			msg := bundleorder.SprintBlock(b, true)
+			msg := bundleorder.SprintBlock(b, true, false)
 			fmt.Println(msg)
 			fmt.Println("")
 		}
