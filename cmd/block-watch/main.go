@@ -210,14 +210,14 @@ func CheckBlockForFailedTx(block *blockswithtx.BlockWithTxReceipts) {
 
 		if sendErrorsToDiscord {
 			if len(failedTransactions) > 1 {
-				msg := fmt.Sprintf("block [%d](<https://etherscan.io/block/%d>) has %d failed tx:\n", block.Block.Number().Uint64(), block.Block.Number().Uint64(), len(failedTransactions))
+				msg := fmt.Sprintf("block [%d](<https://etherscan.io/block/%d>) has %d failed tx (miner: [%s][<https://etherscan.io/address/%s>]):\n", block.Block.Number().Uint64(), block.Block.Number().Uint64(), len(failedTransactions), block.Block.Coinbase().Hex(), block.Block.Coinbase().Hex())
 				for _, tx := range failedTransactions {
-					msg += "- " + failedtx.MsgForFailedTx(tx)
+					msg += "- " + failedtx.MsgForFailedTx(tx, false)
 				}
 				SendToDiscord(msg)
+			} else {
+				SendToDiscord(failedtx.MsgForFailedTx(failedTransactions[0], true))
 			}
-		} else {
-			SendToDiscord(failedtx.MsgForFailedTx(failedTransactions[0]))
 		}
 
 	}
@@ -279,15 +279,12 @@ func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTransact
 					To:          to,
 					Block:       b.Block.Number().Uint64(),
 					IsFlashbots: isFlashbotsTx,
+					Miner:       b.Block.Coinbase().Hex(),
 				}
 				failedTransactions = append(failedTransactions, failedTx)
 
 				// Print to terminal
-				if isFlashbotsTx {
-					utils.ColorPrintf(utils.ErrorColor, "failed Flashbots tx %s from %v in block %s\n", tx.Hash(), sender, b.Block.Number())
-				} else {
-					utils.ColorPrintf(utils.WarningColor, "failed 0-gas tx %s from %v in block %s\n", tx.Hash(), sender, b.Block.Number())
-				}
+				utils.ColorPrintf(utils.ErrorColor, failedtx.MsgForFailedTx(failedTx, true))
 			}
 		}
 	}

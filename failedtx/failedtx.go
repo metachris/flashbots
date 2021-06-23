@@ -10,6 +10,7 @@ type FailedTx struct {
 	To          string
 	Block       uint64
 	IsFlashbots bool // if false then it's a failed 0-gas tx but not from Flashbots
+	Miner       string
 }
 
 // BlockWithFailedTx is used by the webserver, which returns the last 100 blocks with failed tx
@@ -18,10 +19,18 @@ type BlockWithFailedTx struct {
 	FailedTx    []FailedTx
 }
 
-func MsgForFailedTx(tx FailedTx) string {
+func MsgForFailedTx(tx FailedTx, long bool) (msg string) {
 	if tx.IsFlashbots {
-		return fmt.Sprintf("Failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>) in block [%d](<https://etherscan.io/block/%d>)\n", tx.Hash, tx.Hash, tx.From, tx.From, tx.Block, tx.Block)
+		msg += fmt.Sprintf("Failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)", tx.Hash, tx.Hash, tx.From, tx.From)
 	} else {
-		return fmt.Sprintf("Failed 0-gas tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>) in block [%d](<https://etherscan.io/block/%d>)\n", tx.Hash, tx.Hash, tx.From, tx.From, tx.Block, tx.Block)
+		msg += fmt.Sprintf("Failed 0-gas tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)", tx.Hash, tx.Hash, tx.From, tx.From)
 	}
+
+	if long {
+		msg += fmt.Sprintf(" in block [%d](<https://etherscan.io/block/%d>) (miner: [%s][<https://etherscan.io/address/%s>])\n", tx.Block, tx.Block, tx.Miner, tx.Miner)
+	} else {
+		msg += "\n"
+	}
+
+	return msg
 }
