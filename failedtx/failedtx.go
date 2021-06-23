@@ -20,8 +20,8 @@ type BlockWithFailedTx struct {
 
 func MsgForFailedTx(tx FailedTx) string {
 	if tx.IsFlashbots {
-		return fmt.Sprintf("Failed Flashbots tx [%s](https://etherscan.io/tx/%s) from [%s](https://etherscan.io/address/%s) in block [%d](https://etherscan.io/block/%d)\n", tx.Hash, tx.Hash, tx.From, tx.From, tx.Block, tx.Block)
+		return fmt.Sprintf("Failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>) in block [%d](<https://etherscan.io/block/%d>)\n", tx.Hash, tx.Hash, tx.From, tx.From, tx.Block, tx.Block)
 	} else {
-		return fmt.Sprintf("Failed 0-gas tx [%s](https://etherscan.io/tx/%s) from [%s](https://etherscan.io/address/%s) in block [%d](https://etherscan.io/block/%d)\n", tx.Hash, tx.Hash, tx.From, tx.From, tx.Block, tx.Block)
+		return fmt.Sprintf("Failed 0-gas tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>) in block [%d](<https://etherscan.io/block/%d>)\n", tx.Hash, tx.Hash, tx.From, tx.From, tx.Block, tx.Block)
 	}
 }

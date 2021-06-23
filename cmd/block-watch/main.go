@@ -207,6 +207,19 @@ func CheckBlockForFailedTx(block *blockswithtx.BlockWithTxReceipts) {
 		if len(FailedTxHistory) == 100 { // truncate history
 			FailedTxHistory = FailedTxHistory[1:]
 		}
+
+		if sendErrorsToDiscord {
+			if len(failedTransactions) > 1 {
+				msg := fmt.Sprintf("block [%d](<https://etherscan.io/block/%d>) has %d failed tx:\n", block.Block.Number().Uint64(), block.Block.Number().Uint64(), len(failedTransactions))
+				for _, tx := range failedTransactions {
+					msg += "- " + failedtx.MsgForFailedTx(tx)
+				}
+				SendToDiscord(msg)
+			}
+		} else {
+			SendToDiscord(failedtx.MsgForFailedTx(failedTransactions[0]))
+		}
+
 	}
 }
 
@@ -216,8 +229,8 @@ type FlashbotsApiReqRes struct {
 	Response     api.GetBlocksResponse
 }
 
-func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTx []failedtx.FailedTx) {
-	failedTx = make([]failedtx.FailedTx, 0)
+func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTransactions []failedtx.FailedTx) {
+	failedTransactions = make([]failedtx.FailedTx, 0)
 
 	// FlashbotsApiResponseCache is used to avoid querying the Flashbots API multiple times for failed transactions within a single block
 	var flashbotsApiResponseCache FlashbotsApiReqRes
@@ -248,7 +261,7 @@ func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTx []fai
 					isFlashbotsTx, response, err = flashbotsutils.IsFlashbotsTx(b.Block, tx)
 					if err != nil {
 						log.Println("Error:", err)
-						return failedTx
+						return failedTransactions
 					}
 
 					flashbotsApiResponseCache.RequestBlock = b.Block.Number().Int64()
@@ -260,13 +273,14 @@ func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTx []fai
 				if tx.To() != nil {
 					to = tx.To().String()
 				}
-				failedTx = append(failedTx, failedtx.FailedTx{
+				failedTx := failedtx.FailedTx{
 					Hash:        tx.Hash().String(),
 					From:        sender.String(),
 					To:          to,
 					Block:       b.Block.Number().Uint64(),
 					IsFlashbots: isFlashbotsTx,
-				})
+				}
+				failedTransactions = append(failedTransactions, failedTx)
 
 				// Print to terminal
 				if isFlashbotsTx {
@@ -278,7 +292,7 @@ func _checkBlockForFailedTx(b *blockswithtx.BlockWithTxReceipts) (failedTx []fai
 		}
 	}
 
-	return failedTx
+	return failedTransactions
 }
 
 func failedTxHistoryHandler(w http.ResponseWriter, r *http.Request) {

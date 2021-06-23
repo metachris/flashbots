@@ -12,7 +12,6 @@ import (
 
 	"github.com/metachris/flashbots/bundleorder"
 	"github.com/metachris/flashbots/common"
-	"github.com/metachris/flashbots/failedtx"
 )
 
 type DiscordWebhookPayload struct {
@@ -24,10 +23,10 @@ func SendBundleOrderErrorToDiscord(b *common.Block) error {
 	return SendToDiscord("```" + msg + "```")
 }
 
-func SendFailedTxToDiscord(tx failedtx.FailedTx) error {
-	msg := failedtx.MsgForFailedTx(tx)
-	return SendToDiscord(msg)
-}
+// func SendFailedTxToDiscord(tx failedtx.FailedTx) error {
+// 	msg := failedtx.MsgForFailedTx(tx)
+// 	return SendToDiscord(msg)
+// }
 
 func SendToDiscord(msg string) error {
 	url := os.Getenv("DISCORD_WEBHOOK")

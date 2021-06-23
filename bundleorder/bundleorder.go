@@ -57,7 +57,8 @@ func SprintBlock(b *common.Block, color bool) string {
 		} else if bundle.PercentPriceDiff.Cmp(big.NewFloat(0)) == 1 {
 			percentPart = fmt.Sprintf("(+%5s%%)", bundle.PercentPriceDiff.Text('f', 2))
 		}
-		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %18v, total_miner_reward: %18v \t coinbase/gasused: %13v, reward/gasused: %13v %v \n", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, bundle.TotalCoinbaseTransfer, bundle.TotalMinerReward, bundle.CoinbaseDivGasUsed, bundle.RewardDivGasUsed, percentPart)
+
+		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %11v, total_miner_reward: %11v \t coinbase/gasused: %13v, reward/gasused: %13v %v \n", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, common.BigIntToEString(bundle.TotalCoinbaseTransfer, 4), common.BigIntToEString(bundle.TotalMinerReward, 4), common.BigIntToEString(bundle.CoinbaseDivGasUsed, 4), common.BigIntToEString(bundle.RewardDivGasUsed, 4), percentPart)
 	}
 
 	return msg
