@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/metachris/flashbots/bundleorder"
 	"github.com/metachris/flashbots/common"
 )
 
@@ -19,7 +18,7 @@ type DiscordWebhookPayload struct {
 }
 
 func SendBundleOrderErrorToDiscord(b *common.Block) error {
-	msg := bundleorder.SprintBlock(b, false, true)
+	msg := common.SprintBlock(b, false, true)
 	return SendToDiscord(msg)
 }
 

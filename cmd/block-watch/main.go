@@ -1,4 +1,9 @@
-// Watch blocks and check for errors
+// Watch blocks and report issues (to terminal and to Discord)
+//
+// Issues:
+// 1. Failed Flashbots (or other 0-gas) transaction
+// 2. Bundle out of order by effective-gasprice
+// 3. Bundle effective-gasprice is lower than lowest non-fb tx gasprice
 package main
 
 import (
@@ -16,7 +21,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/metachris/flashbots/api"
-	"github.com/metachris/flashbots/bundleorder"
 	"github.com/metachris/flashbots/common"
 	"github.com/metachris/flashbots/failedtx"
 	"github.com/metachris/flashbots/flashbotsutils"
@@ -175,10 +179,19 @@ func CheckBundles(block *blockswithtx.BlockWithTxReceipts) (checkCompleted bool)
 
 	for _, b := range fbBlock.Bundles {
 		if b.RewardDivGasUsed.Cmp(lowestGasPrice) == -1 {
-			fmt.Printf("Bundle %d in block %d has lower effective-gas-price (%v) than lowest non-fb transaction (%v)\n", b.Index, fbBlock.Number, common.BigIntToEString(b.RewardDivGasUsed, 4), common.BigIntToEString(lowestGasPrice, 4))
-			if sendErrorsToDiscord {
-				msg := fmt.Sprintf("Bundle %d in block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) has lower effective_gas_price (%v) than lowest non-fb [transaction](<https://etherscan.io/tx/%s>) (%v)\n", b.Index, fbBlock.Number, fbBlock.Number, fbBlock.Number, common.BigIntToEString(b.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4))
-				SendToDiscord(msg)
+			// calculate percent difference:
+			fCur := new(big.Float).SetInt(b.RewardDivGasUsed)
+			fLow := new(big.Float).SetInt(lowestGasPrice)
+			diffPercent1 := new(big.Float).Quo(fCur, fLow)
+			diffPercent2 := new(big.Float).Sub(big.NewFloat(1), diffPercent1)
+			diffPercent := new(big.Float).Mul(diffPercent2, big.NewFloat(100))
+
+			fmt.Printf("Bundle %d in block %d has %s%% lower effective-gas-price (%v) than lowest non-fb transaction (%v)\n", b.Index, fbBlock.Number, diffPercent.Text('f', 2), common.BigIntToEString(b.RewardDivGasUsed, 4), common.BigIntToEString(lowestGasPrice, 4))
+			if diffPercent.Cmp(big.NewFloat(49)) == 1 {
+				if sendErrorsToDiscord {
+					msg := fmt.Sprintf("Bundle %d in block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) has %s%% lower effective_gas_price (%v) than lowest non-fb [transaction](<https://etherscan.io/tx/%s>) (%v). Miner: [%s](<https://etherscan.io/address/%s>)\n", b.Index, fbBlock.Number, fbBlock.Number, fbBlock.Number, diffPercent.Text('f', 2), common.BigIntToEString(b.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4), fbBlock.Miner, fbBlock.Miner)
+					SendToDiscord(msg)
+				}
 			}
 		}
 	}
@@ -207,41 +220,43 @@ func CheckBlockForBundleOrderErrors(blockNumber int64) (fbBlock *common.Block, c
 		return nil, false
 	}
 
-	b := bundleorder.CheckBlock(flashbotsBlocks.Blocks[0])
-	if b.HasErrors() {
-		msg := bundleorder.SprintBlock(b, true, false)
+	fbBlock = common.NewBlockFromApiBlock(flashbotsBlocks.Blocks[0])
+	fbBlock.Check()
+	if fbBlock.HasErrors() {
+		msg := common.SprintBlock(fbBlock, true, false)
 		fmt.Println(msg)
 		fmt.Println("")
 
 		// send to Discord
-		if sendErrorsToDiscord && b.BiggestBundlePercentPriceDiff > BundlePercentPriceDiffThreshold {
-			err := SendBundleOrderErrorToDiscord(b)
+		if sendErrorsToDiscord && fbBlock.BiggestBundlePercentPriceDiff > BundlePercentPriceDiffThreshold {
+			err := SendBundleOrderErrorToDiscord(fbBlock)
 			if err != nil {
 				log.Println(err)
 			}
 		}
 	}
-	return b, true
+	return fbBlock, true
 }
 
 func CheckRecentBundles() {
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10_000})
+	apiBlocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10_000})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%d blocks\n", len(blocks.Blocks))
+	fmt.Printf("%d blocks\n", len(apiBlocks.Blocks))
 
 	// Sort by blockheight, to iterate in ascending order
-	sort.SliceStable(blocks.Blocks, func(i, j int) bool {
-		return blocks.Blocks[i].BlockNumber < blocks.Blocks[j].BlockNumber
+	sort.SliceStable(apiBlocks.Blocks, func(i, j int) bool {
+		return apiBlocks.Blocks[i].BlockNumber < apiBlocks.Blocks[j].BlockNumber
 	})
 
 	// Check each block
-	for _, block := range blocks.Blocks {
-		b := bundleorder.CheckBlock(block)
-		if b.HasErrors() {
-			msg := bundleorder.SprintBlock(b, true, false)
+	for _, apiBlock := range apiBlocks.Blocks {
+		fbBlock := common.NewBlockFromApiBlock(apiBlock)
+		fbBlock.Check()
+		if fbBlock.HasErrors() {
+			msg := common.SprintBlock(fbBlock, true, false)
 			fmt.Println(msg)
 			fmt.Println("")
 		}

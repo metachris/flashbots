@@ -1,19 +1,21 @@
 # Utilities for [Flashbots](https://github.com/flashbots/pm)
 
 * Go API client for the [mev-blocks API](https://blocks.flashbots.net/) for information about Flashbots blocks and transactions
-* Detect bundle order errors
+* Detect bundle errors: (a) out of order, (b) lower gas fee than lowest non-fb tx
 * Detect failed Flashbots and other 0-gas transactions (can run over history or in 'watch' mode, webserver that serves recent detections)
-* Various Go utilities
+* Various related utilities
 
 Uses:
 
-* https://github.com/metachris/go-ethutils
 * https://github.com/ethereum/go-ethereum
+* https://github.com/metachris/go-ethutils
 
 Notes:
 
-* You should use IPC connections to the geth node, as there are a lot of API calls (one for each tx).
-* PRs and contributions are welcome :)
+* There are a lot of API calls (one for each tx), it will only be fast if you are on (or close to) the geth node.
+* Ideas, feedback and contributions are welcome.
+
+Reach out: [twitter.com/metachris](https://twitter.com/metachris)
 
 ---
 
@@ -42,3 +44,12 @@ block, err := api.GetBlocks(&opts)
 txs, err := GetTransactions(nil)
 ```
 
+---
+
+## Getting Started
+
+A good starting point is `cmd/block-watch/main.go`, which monitors blocks and bundles and reports issues:
+
+* Failed Flashbots (or other 0-gas) transaction
+* Bundle out of order by effective-gasprice
+* Bundle effective-gasprice is lower than lowest non-fb tx gasprice

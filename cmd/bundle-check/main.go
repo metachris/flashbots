@@ -6,40 +6,29 @@
 // https://docs.flashbots.net/flashbots-core/miners/mev-geth-spec/v02/#block-construction
 package main
 
-import (
-	"flag"
-	"fmt"
-	"log"
-	"os"
-	"sort"
-
-	"github.com/metachris/flashbots/api"
-	"github.com/metachris/flashbots/bundleorder"
-)
-
 func main() {
-	log.SetOutput(os.Stdout)
+	// log.SetOutput(os.Stdout)
 
-	blockHeightPtr := flag.Int64("block", 0, "specific block to check")
-	flag.Parse()
+	// blockHeightPtr := flag.Int64("block", 0, "specific block to check")
+	// flag.Parse()
 
-	blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10_000, BlockNumber: *blockHeightPtr})
-	if err != nil {
-		log.Fatal(err)
-	}
+	// blocks, err := api.GetBlocks(&api.GetBlocksOptions{Limit: 10_000, BlockNumber: *blockHeightPtr})
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	fmt.Printf("%d blocks\n", len(blocks.Blocks))
+	// fmt.Printf("%d blocks\n", len(blocks.Blocks))
 
-	// Sort by blockheight, to iterate in ascending order
-	sort.SliceStable(blocks.Blocks, func(i, j int) bool {
-		return blocks.Blocks[i].BlockNumber < blocks.Blocks[j].BlockNumber
-	})
+	// // Sort by blockheight, to iterate in ascending order
+	// sort.SliceStable(blocks.Blocks, func(i, j int) bool {
+	// 	return blocks.Blocks[i].BlockNumber < blocks.Blocks[j].BlockNumber
+	// })
 
-	// Check each block
-	for _, block := range blocks.Blocks {
-		b := bundleorder.CheckBlock(block)
-		if b.HasErrors() {
-			fmt.Println(bundleorder.SprintBlock(b, true, false))
-		}
-	}
+	// // Check each block
+	// for _, block := range blocks.Blocks {
+	// 	b := bundleorder.CheckBlock(block)
+	// 	if b.HasErrors() {
+	// 		fmt.Println(bundleorder.SprintBlock(b, true, false))
+	// 	}
+	// }
 }
