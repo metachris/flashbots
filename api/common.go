@@ -26,7 +26,7 @@ type FlashbotsTransaction struct {
 }
 
 // HasTx returns true if the transaction hash is included in any of the blocks of the API response
-func (b *FlashbotsBlock) HasTx(hash string) bool {
+func (b FlashbotsBlock) HasTx(hash string) bool {
 	for _, tx := range b.Transactions {
 		if tx.Hash == hash {
 			return true

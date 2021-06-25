@@ -8,8 +8,8 @@ go run cmd/block-watch/*.go -block 12693354
 go run cmd/block-watch/*.go -block 12699873 
 
 # Failed Flashbots tx:
-go run cmd/block-watch/*.go -block 12693354 
+go run cmd/block-watch/*.go -block 12705543 
 
 # Failed 0-gas tx:
-go run cmd/block-watch/*.go -block 12693354 
+go run cmd/block-watch/*.go -block 12701683
 ```
