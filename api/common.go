@@ -24,3 +24,13 @@ type FlashbotsTransaction struct {
 	CoinbaseTransfer string `json:"coinbase_transfer"`
 	TotalMinerReward string `json:"total_miner_reward"`
 }
+
+// HasTx returns true if the transaction hash is included in any of the blocks of the API response
+func (b *FlashbotsBlock) HasTx(hash string) bool {
+	for _, tx := range b.Transactions {
+		if tx.Hash == hash {
+			return true
+		}
+	}
+	return false
+}

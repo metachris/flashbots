@@ -17,7 +17,7 @@ type DiscordWebhookPayload struct {
 	Content string `json:"content"`
 }
 
-func SendBundleOrderErrorToDiscord(b *blockcheck.Block) error {
+func SendBundleOrderErrorToDiscord(b *blockcheck.BlockCheck) error {
 	msg := b.Sprint(false, true)
 	return SendToDiscord(msg)
 }

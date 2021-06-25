@@ -256,6 +256,8 @@ github.com/metachris/go-ethutils v0.3.5-0.20210623210935-4f0855ccb9a4 h1:A8BnkIc
 github.com/metachris/go-ethutils v0.3.5-0.20210623210935-4f0855ccb9a4/go.mod h1:HUZaIue4fgyDt2T7IkY+8lDkoTBxFTsBdr9w7a0ZCaM=
 github.com/metachris/go-ethutils v0.4.0 h1:LsNT2OXKUQI6QlBaQZubaGL3JGJ9nLt5dJ8PjgEoCEk=
 github.com/metachris/go-ethutils v0.4.0/go.mod h1:HUZaIue4fgyDt2T7IkY+8lDkoTBxFTsBdr9w7a0ZCaM=
+github.com/metachris/go-ethutils v0.4.1 h1:lZ2g31cTwCi3SF2Zg4eeH3HIDROb7Pwa0Fh2f0QjTh4=
+github.com/metachris/go-ethutils v0.4.1/go.mod h1:HUZaIue4fgyDt2T7IkY+8lDkoTBxFTsBdr9w7a0ZCaM=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/reflect2 v1.0.1/go.mod h1:bx2lNnkwVCuqBIxFjflWJWanXIb3RllmbCylyMrvgv0=
 github.com/mschoch/smat v0.0.0-20160514031455-90eadee771ae/go.mod h1:qAyveg+e4CE+eKJXWVjKXM4ck2QobLqTDytGJbLLhJg=

@@ -17,7 +17,9 @@ type Bundle struct {
 	RewardDivGasUsed   *big.Int
 
 	PercentPriceDiff *big.Float // on order error, % difference to previous bundle
-	IsOutOfOrder     bool
+
+	IsOutOfOrder             bool
+	IsPayingLessThanLowestTx bool
 }
 
 func NewBundle() *Bundle {

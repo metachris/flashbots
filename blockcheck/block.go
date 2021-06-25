@@ -1,26 +1,66 @@
 package blockcheck
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/metachris/flashbots/api"
 	"github.com/metachris/flashbots/common"
+	"github.com/metachris/flashbots/failedtx"
+	"github.com/metachris/go-ethutils/blockswithtx"
 	"github.com/metachris/go-ethutils/utils"
 )
 
-type Block struct {
-	Number  int64
-	Miner   string
-	Bundles []*common.Bundle
+var (
+	ErrFlashbotsApiDoesntHaveThatBlockYet = errors.New("flashbots API latest height < requested block height")
+)
 
-	Errors                        []string
-	BiggestBundlePercentPriceDiff float32 // on order error, % difference to previous bundle
+type BlockCheck struct {
+	Number int64
+	Miner  string
+
+	BlockWithTxReceipts *blockswithtx.BlockWithTxReceipts
+	EthBlock            *types.Block
+	FlashbotsApiBlock   *api.FlashbotsBlock
+	Bundles             []*common.Bundle
+
+	// Collection of errors
+	Errors   []string
+	FailedTx []*types.Transaction
+
+	// Helpers to filter later in user code
+	BiggestBundlePercentPriceDiff float32 // on order error, max % difference to previous bundle
+}
+
+func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) *BlockCheck {
+	check := BlockCheck{
+		BlockWithTxReceipts: blockWithTx,
+		EthBlock:            blockWithTx.Block,
+
+		Number:  blockWithTx.Block.Number().Int64(),
+		Miner:   blockWithTx.Block.Coinbase().Hex(),
+		Bundles: make([]*common.Bundle, 0),
+	}
+
+	check.QueryFlashbotsApi()
+	check.CreateBundles()
+	check.Check()
+	return &check
+}
+
+func (b *BlockCheck) AddError(msg string) {
+	b.Errors = append(b.Errors, msg)
+}
+
+func (b *BlockCheck) HasErrors() bool {
+	return len(b.Errors) > 0
 }
 
 // AddBundle adds the bundle and sorts them by Index
-func (b *Block) AddBundle(bundle *common.Bundle) {
+func (b *BlockCheck) AddBundle(bundle *common.Bundle) {
 	b.Bundles = append(b.Bundles, bundle)
 
 	// Bring bundles into order
@@ -29,20 +69,40 @@ func (b *Block) AddBundle(bundle *common.Bundle) {
 	})
 }
 
-func (b *Block) AddError(msg string) {
-	b.Errors = append(b.Errors, msg)
+func (b *BlockCheck) QueryFlashbotsApi() error {
+	// API call to flashbots
+	opts := api.GetBlocksOptions{BlockNumber: b.Number}
+	flashbotsResponse, err := api.GetBlocks(&opts)
+	if err != nil {
+		return err
+	}
+
+	// Return an error if API doesn't have the block yet
+	if flashbotsResponse.LatestBlockNumber < b.Number {
+		return ErrFlashbotsApiDoesntHaveThatBlockYet
+	}
+
+	if len(flashbotsResponse.Blocks) != 1 {
+		return nil
+	}
+
+	b.FlashbotsApiBlock = &flashbotsResponse.Blocks[0]
+	b.CreateBundles()
+
+	return nil
 }
 
-func (b *Block) HasErrors() bool {
-	return len(b.Errors) > 0
-}
+func (b *BlockCheck) CreateBundles() {
+	if b.FlashbotsApiBlock == nil {
+		return
+	}
 
-func NewBlockFromApiBlock(apiBlock api.FlashbotsBlock) *Block {
-	block := Block{Number: apiBlock.BlockNumber, Miner: apiBlock.Miner}
+	// Clear old bundles
+	b.Bundles = make([]*common.Bundle, 0)
 
-	// Create the bundles
+	// Create the bundles from all Flashbots transactions in this block
 	bundles := make(map[int64]*common.Bundle)
-	for _, tx := range apiBlock.Transactions {
+	for _, tx := range b.FlashbotsApiBlock.Transactions {
 		bundleIndex := tx.BundleIndex
 		bundle, exists := bundles[bundleIndex]
 		if !exists {
@@ -72,31 +132,32 @@ func NewBlockFromApiBlock(apiBlock api.FlashbotsBlock) *Block {
 
 	// Add bundles to the block
 	for _, bundle := range bundles {
-		block.AddBundle(bundle)
+		b.AddBundle(bundle)
 	}
-
-	return &block
 }
 
 // Check analyzes the Flashbots bundles and adds errors when issues are found
-func (block *Block) Check() {
-	numBundles := len(block.Bundles)
+func (b *BlockCheck) Check() {
+	numBundles := len(b.Bundles)
+
+	// Check 0: contains failed Flashbots or 0-gas tx
+	b.checkBlockForFailedTx()
 
 	// Check 1: do all bundles exists or are there gaps?
 	for i := 0; i < numBundles; i++ {
-		if block.Bundles[int64(i)] == nil {
-			block.AddError(fmt.Sprintf("- error: missing bundle # %d in block %d", i, block.Number))
+		if b.Bundles[int64(i)] == nil {
+			b.AddError(fmt.Sprintf("- error: missing bundle # %d in block %d", i, b.Number))
 		}
 	}
 
 	// Check 2: are the bundles in the correct order?
-	lastCoinbaseDivGasused := new(big.Int)
-	lastRewardDivGasused := new(big.Int)
+	lastCoinbaseDivGasused := big.NewInt(-1)
+	lastRewardDivGasused := big.NewInt(-1)
 	for i := 0; i < numBundles; i++ {
-		bundle := block.Bundles[int64(i)]
+		bundle := b.Bundles[int64(i)]
 
 		// if not first bundle, and value larger than from last bundle, print the error
-		if lastCoinbaseDivGasused.Int64() == 0 {
+		if lastCoinbaseDivGasused.Int64() == -1 {
 			// nothing to do on the first bundle
 		} else {
 			percentDiff := new(big.Float).Quo(new(big.Float).SetInt(bundle.RewardDivGasUsed), new(big.Float).SetInt(lastRewardDivGasused))
@@ -109,12 +170,12 @@ func (block *Block) Check() {
 				bundle.RewardDivGasUsed.Cmp(lastRewardDivGasused) == 1 &&
 				bundle.CoinbaseDivGasUsed.Cmp(lastRewardDivGasused) == 1 {
 
-				msg := fmt.Sprintf("- order error: bundle %d pays %v%% more than previous bundle\n", bundle.Index, percentDiff.Text('f', 2))
-				block.AddError(msg)
+				msg := fmt.Sprintf("bundle %d pays %v%% more than previous bundle\n", bundle.Index, percentDiff.Text('f', 2))
+				b.AddError(msg)
 				bundle.IsOutOfOrder = true
 				diffFloat, _ := percentDiff.Float32()
-				if diffFloat > block.BiggestBundlePercentPriceDiff {
-					block.BiggestBundlePercentPriceDiff = diffFloat
+				if diffFloat > b.BiggestBundlePercentPriceDiff {
+					b.BiggestBundlePercentPriceDiff = diffFloat
 				}
 			}
 		}
@@ -122,19 +183,58 @@ func (block *Block) Check() {
 		lastCoinbaseDivGasused = bundle.CoinbaseDivGasUsed
 		lastRewardDivGasused = bundle.RewardDivGasUsed
 	}
+
+	// Check 3: bundle effective gas price > lowest tx gas price
+	// step 1. find lowest non-fb-tx gas price
+	lowestGasPrice := big.NewInt(-1)
+	// lowestGasPriceTxHash := ""
+	for _, tx := range b.EthBlock.Transactions() {
+		isFlashbotsTx := b.FlashbotsApiBlock.HasTx(tx.Hash().String())
+		if isFlashbotsTx {
+			continue
+		}
+
+		if lowestGasPrice.Int64() == -1 || tx.GasPrice().Cmp(lowestGasPrice) == -1 {
+			lowestGasPrice = tx.GasPrice()
+			// lowestGasPriceTxHash = tx.Hash().Hex()
+		}
+	}
+
+	// step 2. compare all fb-tx effective gas prices
+	for _, bundle := range b.Bundles {
+		if bundle.RewardDivGasUsed.Cmp(lowestGasPrice) == -1 {
+			// calculate percent difference:
+			fCur := new(big.Float).SetInt(bundle.RewardDivGasUsed)
+			fLow := new(big.Float).SetInt(lowestGasPrice)
+			diffPercent1 := new(big.Float).Quo(fCur, fLow)
+			diffPercent2 := new(big.Float).Sub(big.NewFloat(1), diffPercent1)
+			diffPercent := new(big.Float).Mul(diffPercent2, big.NewFloat(100))
+
+			msg := fmt.Sprintf("bundle %d has %s%% lower effective-gas-price (%v) than lowest non-fb transaction (%v)\n", bundle.Index, diffPercent.Text('f', 2), common.BigIntToEString(bundle.RewardDivGasUsed, 4), common.BigIntToEString(lowestGasPrice, 4))
+			b.AddError(msg)
+			bundle.IsPayingLessThanLowestTx = true
+			// if diffPercent.Cmp(big.NewFloat(49)) == 1 {
+			// 	if sendErrorsToDiscord {
+			// 		msg := fmt.Sprintf("Bundle %d in block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) has %s%% lower effective_gas_price (%v) than lowest non-fb [transaction](<https://etherscan.io/tx/%s>) (%v). Miner: [%s](<https://etherscan.io/address/%s>)\n", b.Index, fbBlock.Number, fbBlock.Number, fbBlock.Number, diffPercent.Text('f', 2), common.BigIntToEString(b.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4), fbBlock.Miner, fbBlock.Miner)
+			// 		SendToDiscord(msg)
+			// 	}
+			// }
+		}
+	}
 }
 
-func (b *Block) Sprint(color bool, markdown bool) (msg string) {
+func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
 	// Print block info
 	// minerAddr, found := AddressLookupService.GetAddressDetail(b.Miner)
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) - miner: [%s](<https://etherscan.io/address/%s>), bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner [%s](<https://etherscan.io/address/%s>) - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
 	} else {
-		msg = fmt.Sprintf("Block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
+		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
 	}
 
 	// Print errors
 	for _, err := range b.Errors {
+		err = "- error: " + err
 		if color {
 			msg += fmt.Sprintf(utils.WarningColor, err)
 		} else {
@@ -156,9 +256,9 @@ func (b *Block) Sprint(color bool, markdown bool) (msg string) {
 			percentPart = fmt.Sprintf("(+%5s%%)", bundle.PercentPriceDiff.Text('f', 2))
 		}
 
-		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %11v, total_miner_reward: %11v \t coinbase/gasused: %13v, reward/gasused: %13v %v", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, common.BigIntToEString(bundle.TotalCoinbaseTransfer, 4), common.BigIntToEString(bundle.TotalMinerReward, 4), common.BigIntToEString(bundle.CoinbaseDivGasUsed, 4), common.BigIntToEString(bundle.RewardDivGasUsed, 4), percentPart)
-		if bundle.IsOutOfOrder {
-			msg += " <--- out_of_order"
+		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %13v, total_miner_reward: %13v \t coinbase/gasused: %13v, reward/gasused: %13v %v", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, common.BigIntToEString(bundle.TotalCoinbaseTransfer, 4), common.BigIntToEString(bundle.TotalMinerReward, 4), common.BigIntToEString(bundle.CoinbaseDivGasUsed, 4), common.BigIntToEString(bundle.RewardDivGasUsed, 4), percentPart)
+		if bundle.IsOutOfOrder || bundle.IsPayingLessThanLowestTx {
+			msg += " <--"
 		}
 		msg += "\n"
 	}
@@ -168,4 +268,35 @@ func (b *Block) Sprint(color bool, markdown bool) (msg string) {
 	}
 
 	return msg
+}
+
+func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []failedtx.FailedTx) {
+	failedTransactions = make([]failedtx.FailedTx, 0)
+
+	// Iterate over all transactions in this block
+	for _, tx := range b.EthBlock.Transactions() {
+		receipt := b.BlockWithTxReceipts.TxReceipts[tx.Hash()]
+		if receipt == nil {
+			continue
+		}
+
+		if utils.IsBigIntZero(tx.GasPrice()) && len(tx.Data()) > 0 {
+			if receipt.Status == 0 { // successful tx
+				b.FailedTx = append(b.FailedTx, tx)
+				isFlashbotsTx := b.FlashbotsApiBlock.HasTx(tx.Hash().String())
+
+				msg := ""
+				from, _ := utils.GetTxSender(tx)
+				if isFlashbotsTx {
+					msg += fmt.Sprintf("failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)\n", tx.Hash(), tx.Hash(), from, from)
+				} else {
+					msg += fmt.Sprintf("failed 0-gas tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)\n", tx.Hash(), tx.Hash(), from, from)
+				}
+
+				b.AddError(msg)
+			}
+		}
+	}
+
+	return failedTransactions
 }
