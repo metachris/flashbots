@@ -1,4 +1,4 @@
-package common
+package blockcheck
 
 import (
 	"fmt"
@@ -6,19 +6,21 @@ import (
 	"sort"
 
 	"github.com/metachris/flashbots/api"
+	"github.com/metachris/flashbots/common"
+	"github.com/metachris/go-ethutils/utils"
 )
 
 type Block struct {
 	Number  int64
 	Miner   string
-	Bundles []*Bundle
+	Bundles []*common.Bundle
 
 	Errors                        []string
 	BiggestBundlePercentPriceDiff float32 // on order error, % difference to previous bundle
 }
 
 // AddBundle adds the bundle and sorts them by Index
-func (b *Block) AddBundle(bundle *Bundle) {
+func (b *Block) AddBundle(bundle *common.Bundle) {
 	b.Bundles = append(b.Bundles, bundle)
 
 	// Bring bundles into order
@@ -39,12 +41,12 @@ func NewBlockFromApiBlock(apiBlock api.FlashbotsBlock) *Block {
 	block := Block{Number: apiBlock.BlockNumber, Miner: apiBlock.Miner}
 
 	// Create the bundles
-	bundles := make(map[int64]*Bundle)
+	bundles := make(map[int64]*common.Bundle)
 	for _, tx := range apiBlock.Transactions {
 		bundleIndex := tx.BundleIndex
 		bundle, exists := bundles[bundleIndex]
 		if !exists {
-			bundle = NewBundle()
+			bundle = common.NewBundle()
 			bundle.Index = bundleIndex
 			bundles[bundleIndex] = bundle
 		}
@@ -120,4 +122,50 @@ func (block *Block) Check() {
 		lastCoinbaseDivGasused = bundle.CoinbaseDivGasUsed
 		lastRewardDivGasused = bundle.RewardDivGasUsed
 	}
+}
+
+func (b *Block) Sprint(color bool, markdown bool) (msg string) {
+	// Print block info
+	// minerAddr, found := AddressLookupService.GetAddressDetail(b.Miner)
+	if markdown {
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) - miner: [%s](<https://etherscan.io/address/%s>), bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.Bundles))
+	} else {
+		msg = fmt.Sprintf("Block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
+	}
+
+	// Print errors
+	for _, err := range b.Errors {
+		if color {
+			msg += fmt.Sprintf(utils.WarningColor, err)
+		} else {
+			msg += err
+		}
+	}
+
+	if markdown {
+		msg += "```"
+	}
+
+	// Print bundles
+	for _, bundle := range b.Bundles {
+		// Build string for percent(gasprice difference to previous bundle)
+		percentPart := ""
+		if bundle.PercentPriceDiff.Cmp(big.NewFloat(0)) == -1 {
+			percentPart = fmt.Sprintf("(%6s%%)", bundle.PercentPriceDiff.Text('f', 2))
+		} else if bundle.PercentPriceDiff.Cmp(big.NewFloat(0)) == 1 {
+			percentPart = fmt.Sprintf("(+%5s%%)", bundle.PercentPriceDiff.Text('f', 2))
+		}
+
+		msg += fmt.Sprintf("- bundle %d: tx: %d, gasUsed: %7d \t coinbase_transfer: %11v, total_miner_reward: %11v \t coinbase/gasused: %13v, reward/gasused: %13v %v", bundle.Index, len(bundle.Transactions), bundle.TotalGasUsed, common.BigIntToEString(bundle.TotalCoinbaseTransfer, 4), common.BigIntToEString(bundle.TotalMinerReward, 4), common.BigIntToEString(bundle.CoinbaseDivGasUsed, 4), common.BigIntToEString(bundle.RewardDivGasUsed, 4), percentPart)
+		if bundle.IsOutOfOrder {
+			msg += " <--- out_of_order"
+		}
+		msg += "\n"
+	}
+
+	if markdown {
+		msg += "```"
+	}
+
+	return msg
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/metachris/flashbots/api"
+	"github.com/metachris/flashbots/blockcheck"
 	"github.com/metachris/flashbots/common"
 	"github.com/metachris/flashbots/failedtx"
 	"github.com/metachris/flashbots/flashbotsutils"
@@ -205,7 +206,7 @@ func CheckBundles(block *blockswithtx.BlockWithTxReceipts) (checkCompleted bool)
 
 // CheckBlockForBundleOrderErrors builds the fbBlock data structure with all bundles, and checks for bundle-order-errors
 // If there are no Flashbots blocks at the given blockNumber, fbBlock will be nil
-func CheckBlockForBundleOrderErrors(blockNumber int64) (fbBlock *common.Block, checkComplete bool) {
+func CheckBlockForBundleOrderErrors(blockNumber int64) (fbBlock *blockcheck.Block, checkComplete bool) {
 	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: blockNumber})
 	if err != nil {
 		log.Println(err)
@@ -220,10 +221,10 @@ func CheckBlockForBundleOrderErrors(blockNumber int64) (fbBlock *common.Block, c
 		return nil, false
 	}
 
-	fbBlock = common.NewBlockFromApiBlock(flashbotsBlocks.Blocks[0])
+	fbBlock = blockcheck.NewBlockFromApiBlock(flashbotsBlocks.Blocks[0])
 	fbBlock.Check()
 	if fbBlock.HasErrors() {
-		msg := common.SprintBlock(fbBlock, true, false)
+		msg := fbBlock.Sprint(true, false)
 		fmt.Println(msg)
 		fmt.Println("")
 
@@ -253,10 +254,10 @@ func CheckRecentBundles() {
 
 	// Check each block
 	for _, apiBlock := range apiBlocks.Blocks {
-		fbBlock := common.NewBlockFromApiBlock(apiBlock)
+		fbBlock := blockcheck.NewBlockFromApiBlock(apiBlock)
 		fbBlock.Check()
 		if fbBlock.HasErrors() {
-			msg := common.SprintBlock(fbBlock, true, false)
+			msg := fbBlock.Sprint(true, false)
 			fmt.Println(msg)
 			fmt.Println("")
 		}
