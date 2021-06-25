@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"sort"
@@ -16,16 +17,17 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/metachris/flashbots/api"
 	"github.com/metachris/flashbots/bundleorder"
+	"github.com/metachris/flashbots/common"
 	"github.com/metachris/flashbots/failedtx"
 	"github.com/metachris/flashbots/flashbotsutils"
 	"github.com/metachris/go-ethutils/blockswithtx"
 	"github.com/metachris/go-ethutils/utils"
 )
 
+const BundlePercentPriceDiffThreshold float32 = 50
+
 var silent bool
 var sendErrorsToDiscord bool
-
-const BundlePercentPriceDiffThreshold float32 = 50
 
 // var webserverAddr string
 
@@ -55,7 +57,12 @@ func main() {
 	}
 
 	if *blockHeightPtr > 0 {
-		CheckBlockForBundleOrderErrors(*blockHeightPtr)
+		// CheckBlockForBundleOrderErrors(*blockHeightPtr)
+		client, err := ethclient.Dial(*ethUri)
+		utils.Perror(err)
+		b, err := blockswithtx.GetBlockWithTxReceipts(client, *blockHeightPtr)
+		utils.Perror(err)
+		CheckBundles(b)
 	}
 
 	if *watchPtr {
@@ -122,7 +129,7 @@ func watch(ethUri, webserverAddr string) {
 					}
 
 					CheckBlockForFailedTx(blockFromBacklog)
-					checkBundleOrderDone := CheckBlockForBundleOrderErrors(blockFromBacklog.Block.Number().Int64())
+					checkBundleOrderDone := CheckBundles(blockFromBacklog)
 
 					// Success, remove from backlog
 					if checkBundleOrderDone {
@@ -134,22 +141,70 @@ func watch(ethUri, webserverAddr string) {
 	}
 }
 
+// BUNDLE CHECKS
+func CheckBundles(block *blockswithtx.BlockWithTxReceipts) (checkCompleted bool) {
+	// Check for bundle-out-of-order errors
+	fbBlock, checkCompleted := CheckBlockForBundleOrderErrors(block.Block.Number().Int64())
+	if !checkCompleted {
+		return false
+	}
+
+	// If there are no flashbots bundles in this block, fbBlock will be nil
+	if fbBlock == nil {
+		return true
+	}
+
+	// Check bundle effective gas price > lowest tx gas price
+	// 1. find lowest non-fb-tx gas price
+	// 2. compare all fb-tx effective gas prices
+	lowestGasPrice := big.NewInt(-1)
+	lowestGasPriceTxHash := ""
+	for _, tx := range block.Block.Transactions() {
+		isFlashbotsTx, _, err := flashbotsutils.IsFlashbotsTx(block.Block, tx)
+		utils.Perror(err)
+
+		if isFlashbotsTx {
+			continue
+		}
+
+		if lowestGasPrice.Int64() == -1 || tx.GasPrice().Cmp(lowestGasPrice) == -1 {
+			lowestGasPrice = tx.GasPrice()
+			lowestGasPriceTxHash = tx.Hash().Hex()
+		}
+	}
+
+	for _, b := range fbBlock.Bundles {
+		if b.RewardDivGasUsed.Cmp(lowestGasPrice) == -1 {
+			fmt.Printf("Bundle %d in block %d has lower effective-gas-price (%v) than lowest non-fb transaction (%v)\n", b.Index, fbBlock.Number, common.BigIntToEString(b.RewardDivGasUsed, 4), common.BigIntToEString(lowestGasPrice, 4))
+			if sendErrorsToDiscord {
+				msg := fmt.Sprintf("Bundle %d in block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) has lower effective_gas_price (%v) than lowest non-fb [transaction](<https://etherscan.io/tx/%s>) (%v)\n", b.Index, fbBlock.Number, fbBlock.Number, fbBlock.Number, common.BigIntToEString(b.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4))
+				SendToDiscord(msg)
+			}
+		}
+	}
+
+	return true
+}
+
 //
 // CHECK BUNDLE ORDERING
 //
-func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
+
+// CheckBlockForBundleOrderErrors builds the fbBlock data structure with all bundles, and checks for bundle-order-errors
+// If there are no Flashbots blocks at the given blockNumber, fbBlock will be nil
+func CheckBlockForBundleOrderErrors(blockNumber int64) (fbBlock *common.Block, checkComplete bool) {
 	flashbotsBlocks, err := api.GetBlocks(&api.GetBlocksOptions{BlockNumber: blockNumber})
 	if err != nil {
 		log.Println(err)
-		return false
+		return nil, false
 	}
 
 	if len(flashbotsBlocks.Blocks) != 1 {
 		if len(flashbotsBlocks.Blocks) == 0 { // no flashbots tx in this block
-			return true
+			return nil, true
 		}
 		fmt.Printf("- error fetching flashbots block %d - expected 1 block, got %d\n", blockNumber, len(flashbotsBlocks.Blocks))
-		return false
+		return nil, false
 	}
 
 	b := bundleorder.CheckBlock(flashbotsBlocks.Blocks[0])
@@ -166,7 +221,7 @@ func CheckBlockForBundleOrderErrors(blockNumber int64) (checkComplete bool) {
 			}
 		}
 	}
-	return true
+	return b, true
 }
 
 func CheckRecentBundles() {

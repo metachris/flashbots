@@ -1,3 +1,4 @@
 .env
 /out.txt
 /cmd/test
+/tmp

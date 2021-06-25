@@ -20,7 +20,7 @@ type DiscordWebhookPayload struct {
 
 func SendBundleOrderErrorToDiscord(b *common.Block) error {
 	msg := bundleorder.SprintBlock(b, false, true)
-	return SendToDiscord("```" + msg + "```")
+	return SendToDiscord(msg)
 }
 
 // func SendFailedTxToDiscord(tx failedtx.FailedTx) error {

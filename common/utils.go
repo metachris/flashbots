@@ -19,5 +19,9 @@ func BigFloatToEString(f *big.Float, prec int) string {
 func BigIntToEString(i *big.Int, prec int) string {
 	f := new(big.Float)
 	f.SetInt(i)
+	s1 := f.Text('f', 0)
+	if len(s1) < 9 {
+		return i.String()
+	}
 	return BigFloatToEString(f, prec)
 }

@@ -27,7 +27,7 @@ func MsgForFailedTx(tx FailedTx, long bool) (msg string) {
 	}
 
 	if long {
-		msg += fmt.Sprintf(" in block [%d](<https://etherscan.io/block/%d>) (miner: [%s][<https://etherscan.io/address/%s>])\n", tx.Block, tx.Block, tx.Miner, tx.Miner)
+		msg += fmt.Sprintf(" in block [%d](<https://etherscan.io/block/%d>) (miner: [%s](<https://etherscan.io/address/%s>))\n", tx.Block, tx.Block, tx.Miner, tx.Miner)
 	} else {
 		msg += "\n"
 	}

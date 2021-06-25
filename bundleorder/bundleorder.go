@@ -38,8 +38,9 @@ func CheckRecent() {
 
 func SprintBlock(b *common.Block, color bool, markdown bool) (msg string) {
 	// Print block info
+	// minerAddr, found := common.AddressLookupService.GetAddressDetail(b.Miner)
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) - miner: [%s][<https://etherscan.io/address/%s>]), bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)) - miner: [%s](<https://etherscan.io/address/%s>), bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.Bundles))
 	} else {
 		msg = fmt.Sprintf("Block %d - miner: %s, bundles: %d\n", b.Number, b.Miner, len(b.Bundles))
 	}
@@ -51,6 +52,10 @@ func SprintBlock(b *common.Block, color bool, markdown bool) (msg string) {
 		} else {
 			msg += err
 		}
+	}
+
+	if markdown {
+		msg += "```"
 	}
 
 	// Print bundles
@@ -68,6 +73,10 @@ func SprintBlock(b *common.Block, color bool, markdown bool) (msg string) {
 			msg += " <--- out_of_order"
 		}
 		msg += "\n"
+	}
+
+	if markdown {
+		msg += "```"
 	}
 
 	return msg
