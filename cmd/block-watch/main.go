@@ -92,7 +92,7 @@ func watch(client *ethclient.Client) {
 			utils.Perror(err)
 
 			if !silent {
-				fmt.Println("xp Queueing new block", b.Block.Number())
+				fmt.Println("Queueing new block", b.Block.Number())
 			}
 
 			// Add to backlog, because it can only be processed when the Flashbots API has caught up

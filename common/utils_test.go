@@ -31,7 +31,7 @@ func TestBigFloatToEString(t *testing.T) {
 	}
 
 	s = BigFloatToEString(f16, 3)
-	if s != "2255212.010e+09" {
+	if s != "0.002e+18" {
 		t.Error("Unexpected result string from BigFloatToEString:", s)
 	}
 
