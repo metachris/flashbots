@@ -22,15 +22,14 @@ func SendBundleOrderErrorToDiscord(b *blockcheck.BlockCheck) error {
 	return SendToDiscord(msg)
 }
 
-// func SendFailedTxToDiscord(tx failedtx.FailedTx) error {
-// 	msg := failedtx.MsgForFailedTx(tx)
-// 	return SendToDiscord(msg)
-// }
-
 func SendToDiscord(msg string) error {
 	url := os.Getenv("DISCORD_WEBHOOK")
 	if len(url) == 0 {
 		return errors.New("no DISCORD_WEBHOOK env variable found")
+	}
+
+	if len(msg) > 2000 {
+		msg = msg[0:1997] + "..."
 	}
 
 	discordPayload := DiscordWebhookPayload{Content: msg}

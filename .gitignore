@@ -1,4 +1,5 @@
 .env
-/out.txt
 /cmd/test
 /tmp
+/out.txt
+/out*.txt

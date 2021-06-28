@@ -7,6 +7,27 @@ import (
 	"strings"
 )
 
+type FlashbotsBlock struct {
+	BlockNumber       int64  `json:"block_number"`
+	Miner             string `json:"miner"`
+	MinerReward       string `json:"miner_reward"`
+	CoinbaseTransfers string `json:"coinbase_transfers"`
+
+	GasUsed      int64                  `json:"gas_used"`
+	GasPrice     string                 `json:"gas_price"`
+	Transactions []FlashbotsTransaction `json:"transactions"`
+}
+
+// HasTx returns true if the transaction hash is included in any of the blocks of the API response
+func (b FlashbotsBlock) HasTx(hash string) bool {
+	for _, tx := range b.Transactions {
+		if tx.Hash == hash {
+			return true
+		}
+	}
+	return false
+}
+
 type GetBlocksOptions struct {
 	BlockNumber int64
 	Miner       string

@@ -67,7 +67,7 @@ func main() {
 			fmt.Println("CheckBlock error:", err)
 		}
 		msg := check.Sprint(true, false)
-		fmt.Printf(msg)
+		print(msg)
 	}
 
 	if *watchPtr {
@@ -90,7 +90,7 @@ func watch(client *ethclient.Client) {
 			utils.Perror(err)
 
 			if !silent {
-				fmt.Println("Queueing new block", b.Block.Number())
+				fmt.Println("xp Queueing new block", b.Block.Number())
 			}
 
 			// Add to backlog, because it can only be processed when the Flashbots API has caught up
@@ -117,9 +117,15 @@ func watch(client *ethclient.Client) {
 					} else {
 						// no checking error, can process and remove from backlog
 						delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())
-						if check.HasErrors() {
+
+						// if check.HasErrors() {
+						if check.HasSeriousErrors() {
 							msg := check.Sprint(true, false)
-							fmt.Printf(msg)
+							print(msg)
+
+							if sendErrorsToDiscord {
+								SendToDiscord(check.Sprint(false, true))
+							}
 						}
 					}
 				}
