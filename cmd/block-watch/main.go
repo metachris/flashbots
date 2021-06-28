@@ -53,8 +53,10 @@ func main() {
 		log.Fatal("Pass a valid eth node with -eth argument or ETH_NODE env var.")
 	}
 
+	fmt.Printf("Connecting to %s ...", *ethUri)
 	client, err := ethclient.Dial(*ethUri)
 	utils.Perror(err)
+	fmt.Printf(" ok\n")
 
 	if *blockHeightPtr != 0 {
 		// get block with receipts
@@ -126,6 +128,7 @@ func watch(client *ethclient.Client) {
 							if sendErrorsToDiscord {
 								SendToDiscord(check.Sprint(false, true))
 							}
+							fmt.Println("")
 						}
 					}
 				}

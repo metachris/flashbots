@@ -228,7 +228,7 @@ func (b *BlockCheck) Check() {
 	// Check 3: bundle effective gas price > lowest tx gas price
 	// step 1. find lowest non-fb-tx gas price
 	lowestGasPrice := big.NewInt(-1)
-	// lowestGasPriceTxHash := ""
+	lowestGasPriceTxHash := ""
 	for _, tx := range b.EthBlock.Transactions() {
 		isFlashbotsTx := b.IsFlashbotsTx(tx.Hash().String())
 		if isFlashbotsTx {
@@ -237,7 +237,7 @@ func (b *BlockCheck) Check() {
 
 		if lowestGasPrice.Int64() == -1 || tx.GasPrice().Cmp(lowestGasPrice) == -1 {
 			lowestGasPrice = tx.GasPrice()
-			// lowestGasPriceTxHash = tx.Hash().Hex()
+			lowestGasPriceTxHash = tx.Hash().Hex()
 		}
 	}
 
@@ -251,7 +251,7 @@ func (b *BlockCheck) Check() {
 			diffPercent2 := new(big.Float).Sub(big.NewFloat(1), diffPercent1)
 			diffPercent := new(big.Float).Mul(diffPercent2, big.NewFloat(100))
 
-			msg := fmt.Sprintf("bundle %d has %s%s lower effective-gas-price (%v) than lowest non-fb transaction (%v)\n", bundle.Index, diffPercent.Text('f', 2), "%", common.BigIntToEString(bundle.RewardDivGasUsed, 4), common.BigIntToEString(lowestGasPrice, 4))
+			msg := fmt.Sprintf("bundle %d has %s%s lower effective-gas-price (%v) than [lowest non-fb transaction](<https://etherscan.io/address/%s>) (%v)\n", bundle.Index, diffPercent.Text('f', 2), "%", common.BigIntToEString(bundle.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4))
 			b.AddError(msg)
 			bundle.IsPayingLessThanLowestTx = true
 			b.BundleIsPayingLessThanLowestTxPercentDiff, _ = diffPercent.Float32()
@@ -263,7 +263,7 @@ func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
 	// Print block info
 	// minerAddr, found := AddressLookupService.GetAddressDetail(b.Miner)
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner [%s](<https://etherscan.io/address/%s>) - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner [%s](<https://etherscan.io/tx/%s>) - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
 	} else {
 		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
 	}
