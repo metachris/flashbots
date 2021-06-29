@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/metachris/flashbots/api"
 	"github.com/metachris/flashbots/common"
+	"github.com/metachris/go-ethutils/addresslookup"
 	"github.com/metachris/go-ethutils/blockswithtx"
 	"github.com/metachris/go-ethutils/utils"
 )
@@ -20,6 +22,9 @@ var (
 
 var ThresholdBiggestBundlePercentPriceDiff float32 = 50
 var ThresholdBundleIsPayingLessThanLowestTxPercentDiff float32 = 50
+
+var AddressLookup *addresslookup.AddressLookupService
+var AddressesUpdated time.Time
 
 type BlockCheck struct {
 	Number int64
@@ -52,6 +57,22 @@ func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) (blockCheck *Bloc
 		Number:  blockWithTx.Block.Number().Int64(),
 		Miner:   blockWithTx.Block.Coinbase().Hex(),
 		Bundles: make([]*common.Bundle, 0),
+	}
+
+	if AddressLookup == nil {
+		AddressLookup = addresslookup.NewAddressLookupService(nil)
+		err = AddressLookup.AddAllAddresses()
+		if err != nil {
+			return blockCheck, err
+		}
+		AddressesUpdated = time.Now()
+	} else { // after 5 minutes, update addresses
+		timeSinceAddressUpdate := time.Since(AddressesUpdated)
+		if timeSinceAddressUpdate.Seconds() > 60*5 {
+			AddressLookup.ClearCache()
+			AddressLookup.AddAllAddresses()
+			AddressesUpdated = time.Now()
+		}
 	}
 
 	err = check.QueryFlashbotsApi()
@@ -260,12 +281,16 @@ func (b *BlockCheck) Check() {
 }
 
 func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
-	// Print block info
-	// minerAddr, found := AddressLookupService.GetAddressDetail(b.Miner)
+	minerAddr, found := AddressLookup.GetAddressDetail(b.Miner)
+	minerStr := fmt.Sprintf("[%s](<https://etherscan.io/address/%s>)", b.Miner, b.Miner)
+	if found {
+		minerStr += fmt.Sprintf(" (%s)", minerAddr.Name)
+	}
+
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner [%s](<https://etherscan.io/tx/%s>) - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Number, b.Number, b.Miner, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Number, b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
 	} else {
-		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Miner, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
 	}
 
 	// Print errors

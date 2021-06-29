@@ -82,6 +82,9 @@ func watch(client *ethclient.Client) {
 	sub, err := client.SubscribeNewHead(context.Background(), headers)
 	utils.Perror(err)
 
+	var errorCountSerious int
+	var errorCountNonSerious int
+
 	for {
 		select {
 		case err := <-sub.Err():
@@ -120,16 +123,24 @@ func watch(client *ethclient.Client) {
 						// no checking error, can process and remove from backlog
 						delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())
 
-						// if check.HasErrors() {
-						if check.HasSeriousErrors() {
-							msg := check.Sprint(true, false)
-							print(msg)
+						// Handle errors in the bundle (print, Discord, etc.)
+						if check.HasErrors() {
+							if check.HasSeriousErrors() {
+								errorCountSerious += 1
+								msg := check.Sprint(true, false)
+								print(msg)
 
-							if sendErrorsToDiscord {
-								SendToDiscord(check.Sprint(false, true))
+								if sendErrorsToDiscord {
+									SendToDiscord(check.Sprint(false, true))
+								}
+								fmt.Println("")
+							} else if check.BiggestBundlePercentPriceDiff > 25 || check.BundleIsPayingLessThanLowestTxPercentDiff > 25 {
+								errorCountNonSerious += 1
 							}
-							fmt.Println("")
+
+							fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
 						}
+
 					}
 				}
 			}
