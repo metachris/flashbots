@@ -93,6 +93,11 @@ func (b *BlockCheck) HasErrors() bool {
 }
 
 func (b *BlockCheck) HasSeriousErrors() bool {
+	// Failed tx
+	if len(b.FailedTx) > 0 {
+		return true
+	}
+
 	// Bundle percent price diff
 	if b.BiggestBundlePercentPriceDiff >= ThresholdBiggestBundlePercentPriceDiff {
 		return true
@@ -103,8 +108,22 @@ func (b *BlockCheck) HasSeriousErrors() bool {
 		return true
 	}
 
+	return false
+}
+
+func (b *BlockCheck) HasLessSeriousErrors() bool {
 	// Failed tx
 	if len(b.FailedTx) > 0 {
+		return true
+	}
+
+	// Bundle percent price diff
+	if b.BiggestBundlePercentPriceDiff >= 25 {
+		return true
+	}
+
+	// Bundle lower than lowest non-fb tx
+	if b.BundleIsPayingLessThanLowestTxPercentDiff >= 25 {
 		return true
 	}
 
@@ -227,8 +246,7 @@ func (b *BlockCheck) Check() {
 			percentDiff = new(big.Float).Mul(percentDiff, big.NewFloat(100))
 			bundle.PercentPriceDiff = percentDiff
 
-			if lastCoinbaseDivGasused.Int64() != 0 &&
-				bundle.CoinbaseDivGasUsed.Cmp(lastCoinbaseDivGasused) == 1 &&
+			if bundle.CoinbaseDivGasUsed.Cmp(lastCoinbaseDivGasused) == 1 &&
 				bundle.RewardDivGasUsed.Cmp(lastRewardDivGasused) == 1 &&
 				bundle.CoinbaseDivGasUsed.Cmp(lastRewardDivGasused) == 1 {
 
@@ -262,7 +280,7 @@ func (b *BlockCheck) Check() {
 		}
 	}
 
-	// step 2. compare all fb-tx effective gas prices
+	// step 2. compare all fb-tx effective gas prices to lowest
 	for _, bundle := range b.Bundles {
 		if bundle.RewardDivGasUsed.Cmp(lowestGasPrice) == -1 {
 			// calculate percent difference:

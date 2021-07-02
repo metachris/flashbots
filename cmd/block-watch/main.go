@@ -134,11 +134,13 @@ func watch(client *ethclient.Client) {
 									SendToDiscord(check.Sprint(false, true))
 								}
 								fmt.Println("")
-							} else if check.BiggestBundlePercentPriceDiff > 25 || check.BundleIsPayingLessThanLowestTxPercentDiff > 25 {
+							} else if check.HasLessSeriousErrors() {
 								errorCountNonSerious += 1
 							}
 
-							fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
+							if check.HasSeriousErrors() || check.HasLessSeriousErrors() {
+								fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
+							}
 						}
 
 					}
