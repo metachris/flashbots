@@ -29,7 +29,7 @@ func SendToDiscord(msg string) error {
 	}
 
 	if len(msg) > 2000 {
-		msg = msg[0:1997] + "..."
+		msg = msg[0:1994] + "...```"
 	}
 
 	discordPayload := DiscordWebhookPayload{Content: msg}

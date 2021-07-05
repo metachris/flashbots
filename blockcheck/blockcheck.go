@@ -26,9 +26,17 @@ var ThresholdBundleIsPayingLessThanLowestTxPercentDiff float32 = 50
 var AddressLookup *addresslookup.AddressLookupService
 var AddressesUpdated time.Time
 
+type ErrorCounts struct {
+	FailedFlashbotsTx                  uint64
+	Failed0GasTx                       uint64
+	BundlePaysMoreThanPrevBundle       uint64
+	BundleHasLowerFeeThanLowestNonFbTx uint64
+}
+
 type BlockCheck struct {
-	Number int64
-	Miner  string
+	Number    int64
+	Miner     string
+	MinerName string
 
 	BlockWithTxReceipts   *blockswithtx.BlockWithTxReceipts
 	EthBlock              *types.Block
@@ -46,19 +54,12 @@ type BlockCheck struct {
 
 	HasFailedFlashbotsTx bool
 	HasFailed0GasTx      bool
+
+	ErrorCounter ErrorCounts
 }
 
 func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) (blockCheck *BlockCheck, err error) {
-	check := BlockCheck{
-		BlockWithTxReceipts:   blockWithTx,
-		EthBlock:              blockWithTx.Block,
-		FlashbotsTransactions: make([]api.FlashbotsTransaction, 0),
-
-		Number:  blockWithTx.Block.Number().Int64(),
-		Miner:   blockWithTx.Block.Coinbase().Hex(),
-		Bundles: make([]*common.Bundle, 0),
-	}
-
+	// Init / update AddressLookup service
 	if AddressLookup == nil {
 		AddressLookup = addresslookup.NewAddressLookupService(nil)
 		err = AddressLookup.AddAllAddresses()
@@ -73,6 +74,22 @@ func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) (blockCheck *Bloc
 			AddressLookup.AddAllAddresses()
 			AddressesUpdated = time.Now()
 		}
+	}
+
+	// Lookup miner details
+	minerAddr, _ := AddressLookup.GetAddressDetail(blockWithTx.Block.Coinbase().Hex())
+
+	// Create check result
+	check := BlockCheck{
+		BlockWithTxReceipts:   blockWithTx,
+		EthBlock:              blockWithTx.Block,
+		FlashbotsTransactions: make([]api.FlashbotsTransaction, 0),
+
+		Number:       blockWithTx.Block.Number().Int64(),
+		Miner:        blockWithTx.Block.Coinbase().Hex(),
+		MinerName:    minerAddr.Name,
+		Bundles:      make([]*common.Bundle, 0),
+		ErrorCounter: ErrorCounts{},
 	}
 
 	err = check.QueryFlashbotsApi()
@@ -252,6 +269,7 @@ func (b *BlockCheck) Check() {
 
 				msg := fmt.Sprintf("bundle %d pays %v%s more than previous bundle\n", bundle.Index, percentDiff.Text('f', 2), "%")
 				b.AddError(msg)
+				b.ErrorCounter.BundlePaysMoreThanPrevBundle += 1
 				bundle.IsOutOfOrder = true
 				diffFloat, _ := percentDiff.Float32()
 				if diffFloat > b.BiggestBundlePercentPriceDiff {
@@ -292,6 +310,7 @@ func (b *BlockCheck) Check() {
 
 			msg := fmt.Sprintf("bundle %d has %s%s lower effective-gas-price (%v) than [lowest non-fb transaction](<https://etherscan.io/address/%s>) (%v)\n", bundle.Index, diffPercent.Text('f', 2), "%", common.BigIntToEString(bundle.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4))
 			b.AddError(msg)
+			b.ErrorCounter.BundleHasLowerFeeThanLowestNonFbTx += 1
 			bundle.IsPayingLessThanLowestTx = true
 			b.BundleIsPayingLessThanLowestTxPercentDiff, _ = diffPercent.Float32()
 		}
@@ -368,6 +387,7 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 				Block:       uint64(fbTx.BlockNumber),
 			}
 			msg := fmt.Sprintf("failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)\n", fbTx.Hash, fbTx.Hash, fbTx.EoaAddress, fbTx.EoaAddress)
+			b.ErrorCounter.FailedFlashbotsTx += 1
 			b.AddError(msg)
 			b.HasFailedFlashbotsTx = true
 		}
@@ -398,6 +418,7 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 
 				msg := fmt.Sprintf("failed 0-gas tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)\n", tx.Hash(), tx.Hash(), from, from)
 				b.AddError(msg)
+				b.ErrorCounter.Failed0GasTx += 1
 				b.HasFailed0GasTx = true
 			}
 		}

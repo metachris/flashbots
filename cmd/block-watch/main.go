@@ -21,12 +21,22 @@ import (
 	"github.com/metachris/go-ethutils/utils"
 )
 
-const BundlePercentPriceDiffThreshold float32 = 50
-
 var silent bool
 var sendErrorsToDiscord bool
 
+// Backlog of new blocks that are not yet present in the mev-blocks API (it has ~5 blocks delay)
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
+
+// Counts of errors per miner
+type MinerErrorCount struct {
+	ErrorCounts blockcheck.ErrorCounts
+
+	MinerHash string
+	MinerName string
+	Blocks    map[int64]bool
+}
+
+var MinerErrors map[string]*MinerErrorCount = make(map[string]*MinerErrorCount)
 
 func main() {
 	log.SetOutput(os.Stdout)
@@ -125,7 +135,7 @@ func watch(client *ethclient.Client) {
 
 						// Handle errors in the bundle (print, Discord, etc.)
 						if check.HasErrors() {
-							if check.HasSeriousErrors() {
+							if check.HasSeriousErrors() { // only serious errors are printed and sent to Discord
 								errorCountSerious += 1
 								msg := check.Sprint(true, false)
 								print(msg)
@@ -134,18 +144,50 @@ func watch(client *ethclient.Client) {
 									SendToDiscord(check.Sprint(false, true))
 								}
 								fmt.Println("")
-							} else if check.HasLessSeriousErrors() {
+							} else if check.HasLessSeriousErrors() { // less serious errors are only counted
 								errorCountNonSerious += 1
 							}
 
-							if check.HasSeriousErrors() || check.HasLessSeriousErrors() {
+							if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
 								fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
+								AddErrorCountsToMinerErrors(check)
+								PrintMinerErrors()
 							}
 						}
 
+						// AddErrorCountsToMinerErrors(check)
+						// PrintMinerErrors()
 					}
 				}
 			}
 		}
 	}
 }
+
+func AddErrorCountsToMinerErrors(check *blockcheck.BlockCheck) {
+	_, found := MinerErrors[check.Miner]
+	if !found {
+		MinerErrors[check.Miner] = &MinerErrorCount{
+			MinerHash: check.Miner,
+			MinerName: check.MinerName,
+			Blocks:    make(map[int64]bool),
+		}
+	}
+	MinerErrors[check.Miner].Blocks[check.Number] = true
+	MinerErrors[check.Miner].ErrorCounts.Failed0GasTx += check.ErrorCounter.Failed0GasTx
+	MinerErrors[check.Miner].ErrorCounts.FailedFlashbotsTx += check.ErrorCounter.FailedFlashbotsTx
+	MinerErrors[check.Miner].ErrorCounts.BundlePaysMoreThanPrevBundle += check.ErrorCounter.BundlePaysMoreThanPrevBundle
+	MinerErrors[check.Miner].ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx += check.ErrorCounter.BundleHasLowerFeeThanLowestNonFbTx
+}
+
+func PrintMinerErrors() {
+	for k, v := range MinerErrors {
+		minerInfo := k
+		if v.MinerName != "" {
+			minerInfo += fmt.Sprintf(" (%s)", v.MinerName)
+		}
+		fmt.Printf("%-66s blocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx)
+	}
+}
+
+// 0x5A0b54D5dc17e0AadC383d2db43B0a0D3E029c4c (Spark Pool)
