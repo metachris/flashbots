@@ -76,7 +76,7 @@ func main() {
 		// check the block
 		check, err := blockcheck.CheckBlock(block)
 		if err != nil {
-			fmt.Println("CheckBlock error:", err)
+			fmt.Println("Check at height error:", err)
 		}
 		msg := check.Sprint(true, false)
 		print(msg)
@@ -128,7 +128,7 @@ func watch(client *ethclient.Client) {
 
 					check, err := blockcheck.CheckBlock(blockFromBacklog)
 					if err != nil {
-						fmt.Println("CheckBlock error:", err, "block:", blockFromBacklog.Block.Number())
+						log.Println("CheckBlock from backlog error:", err, "block:", blockFromBacklog.Block.Number())
 					} else {
 						// no checking error, can process and remove from backlog
 						delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())

@@ -96,11 +96,18 @@ func GetBlocks(options *GetBlocksOptions) (response GetBlocksResponse, err error
 
 	resp, err := http.Get(url)
 	if err != nil {
+		err := fmt.Errorf("mev-blocks api request error: %s - %w", url, err)
+		return response, err
+	}
+
+	if resp.StatusCode >= 400 {
+		err := fmt.Errorf("mev-blocks api response status code error: %s - %s", resp.Status, url)
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
+		err := fmt.Errorf("mev-blocks api response decode error: %s - %w", url, err)
 		return response, err
 	}
 

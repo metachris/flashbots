@@ -238,6 +238,9 @@ func (b *BlockCheck) IsFlashbotsTx(hash string) bool {
 func (b *BlockCheck) Check() {
 	numBundles := len(b.Bundles)
 
+	// // Check: uncles
+	// b.BlockWithTxReceipts.Block.Uncles()
+
 	// Check 0: contains failed Flashbots or 0-gas tx
 	b.checkBlockForFailedTx()
 
