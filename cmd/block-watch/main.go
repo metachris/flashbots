@@ -129,41 +129,39 @@ func watch(client *ethclient.Client) {
 					check, err := blockcheck.CheckBlock(blockFromBacklog)
 					if err != nil {
 						log.Println("CheckBlock from backlog error:", err, "block:", blockFromBacklog.Block.Number())
-					} else {
-						// no checking error, can process and remove from backlog
-						delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())
+						return
+					}
 
-						// Handle errors in the bundle (print, Discord, etc.)
-						if check.HasErrors() {
-							if check.HasSeriousErrors() { // only serious errors are printed and sent to Discord
-								errorCountSerious += 1
-								msg := check.Sprint(true, false)
-								print(msg)
+					// no checking error, can process and remove from backlog
+					delete(BlockBacklog, blockFromBacklog.Block.Number().Int64())
 
-								if sendErrorsToDiscord {
-									if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {
-										// Short message if only 1 error and that is a 0-effective-gas-price
-										msg := check.SprintHeader(false, true)
-										msg += " - " + check.Errors[0]
-										SendToDiscord(msg)
-									} else {
-										SendToDiscord(check.Sprint(false, true))
-									}
+					// Handle errors in the bundle (print, Discord, etc.)
+					if check.HasErrors() {
+						if check.HasSeriousErrors() { // only serious errors are printed and sent to Discord
+							errorCountSerious += 1
+							msg := check.Sprint(true, false)
+							print(msg)
+
+							if sendErrorsToDiscord {
+								if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {
+									// Short message if only 1 error and that is a 0-effective-gas-price
+									msg := check.SprintHeader(false, true)
+									msg += " - " + check.Errors[0]
+									SendToDiscord(msg)
+								} else {
+									SendToDiscord(check.Sprint(false, true))
 								}
-								fmt.Println("")
-							} else if check.HasLessSeriousErrors() { // less serious errors are only counted
-								errorCountNonSerious += 1
 							}
-
-							if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
-								fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
-								AddErrorCountsToMinerErrors(check)
-								PrintMinerErrors()
-							}
+							fmt.Println("")
+						} else if check.HasLessSeriousErrors() { // less serious errors are only counted
+							errorCountNonSerious += 1
 						}
 
-						// AddErrorCountsToMinerErrors(check)
-						// PrintMinerErrors()
+						if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
+							fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
+							AddErrorCountsToMinerErrors(check)
+							PrintMinerErrors()
+						}
 					}
 				}
 			}
@@ -198,5 +196,3 @@ func PrintMinerErrors() {
 		fmt.Printf("%-66s blocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, v.ErrorCounts.BundleHas0Fee, v.ErrorCounts.BundleHasNegativeFee)
 	}
 }
-
-// 0x5A0b54D5dc17e0AadC383d2db43B0a0D3E029c4c (Spark Pool)
