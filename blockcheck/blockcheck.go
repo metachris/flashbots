@@ -421,7 +421,8 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 				To:          fbTx.ToAddress,
 				Block:       uint64(fbTx.BlockNumber),
 			}
-			msg := fmt.Sprintf("failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) from [%s](<https://etherscan.io/address/%s>)\n", fbTx.Hash, fbTx.Hash, fbTx.EoaAddress, fbTx.EoaAddress)
+
+			msg := fmt.Sprintf("failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) in bundle %d (from [%s](<https://etherscan.io/address/%s>))\n", fbTx.Hash, fbTx.Hash, fbTx.BundleIndex, fbTx.EoaAddress, fbTx.EoaAddress)
 			b.ErrorCounter.FailedFlashbotsTx += 1
 			b.AddError(msg)
 			b.HasFailedFlashbotsTx = true

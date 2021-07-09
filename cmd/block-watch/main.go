@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -163,6 +164,8 @@ func watch(client *ethclient.Client) {
 							PrintMinerErrors()
 						}
 					}
+
+					time.Sleep(1 * time.Second)
 				}
 			}
 		}
