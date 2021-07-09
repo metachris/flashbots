@@ -18,8 +18,10 @@ type Bundle struct {
 
 	PercentPriceDiff *big.Float // on order error, % difference to previous bundle
 
-	IsOutOfOrder             bool
-	IsPayingLessThanLowestTx bool
+	IsOutOfOrder                bool
+	IsPayingLessThanLowestTx    bool
+	Is0EffectiveGasPrice        bool
+	IsNegativeEffectiveGasPrice bool
 }
 
 func NewBundle() *Bundle {

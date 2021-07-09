@@ -31,6 +31,8 @@ type ErrorCounts struct {
 	Failed0GasTx                       uint64
 	BundlePaysMoreThanPrevBundle       uint64
 	BundleHasLowerFeeThanLowestNonFbTx uint64
+	BundleHas0Fee                      uint64
+	BundleHasNegativeFee               uint64
 }
 
 type BlockCheck struct {
@@ -52,8 +54,10 @@ type BlockCheck struct {
 	BiggestBundlePercentPriceDiff             float32 // on order error, max % difference to previous bundle
 	BundleIsPayingLessThanLowestTxPercentDiff float32
 
-	HasFailedFlashbotsTx bool
-	HasFailed0GasTx      bool
+	HasBundleWith0EffectiveGasPrice bool
+	HasFailedFlashbotsTx            bool
+	HasFailed0GasTx                 bool
+	ManualHasSeriousError           bool // manually set by specific error conditions
 
 	ErrorCounter ErrorCounts
 }
@@ -112,6 +116,10 @@ func (b *BlockCheck) HasErrors() bool {
 func (b *BlockCheck) HasSeriousErrors() bool {
 	// Failed tx
 	if len(b.FailedTx) > 0 {
+		return true
+	}
+
+	if b.ManualHasSeriousError {
 		return true
 	}
 
@@ -238,7 +246,7 @@ func (b *BlockCheck) IsFlashbotsTx(hash string) bool {
 func (b *BlockCheck) Check() {
 	numBundles := len(b.Bundles)
 
-	// // Check: uncles
+	// TODO: Check uncle-bandit-attack
 	// b.BlockWithTxReceipts.Block.Uncles()
 
 	// Check 0: contains failed Flashbots or 0-gas tx
@@ -296,14 +304,34 @@ func (b *BlockCheck) Check() {
 		}
 
 		if lowestGasPrice.Int64() == -1 || tx.GasPrice().Cmp(lowestGasPrice) == -1 {
+			if utils.IsBigIntZero(tx.GasPrice()) && len(tx.Data()) > 0 { // don't count Flashbots-like tx
+				continue
+			}
 			lowestGasPrice = tx.GasPrice()
 			lowestGasPriceTxHash = tx.Hash().Hex()
 		}
 	}
 
-	// step 2. compare all fb-tx effective gas prices to lowest
+	// step 2. check gas prices and fees
 	for _, bundle := range b.Bundles {
-		if bundle.RewardDivGasUsed.Cmp(lowestGasPrice) == -1 {
+		if bundle.RewardDivGasUsed.Cmp(ethcommon.Big0) == -1 { // negative fee
+			bundle.IsNegativeEffectiveGasPrice = true
+			msg := fmt.Sprintf("bundle %d has negative effective-gas-price (%v)\n", bundle.Index, common.BigIntToEString(bundle.RewardDivGasUsed, 4))
+			b.AddError(msg)
+			b.ErrorCounter.BundleHasNegativeFee += 1
+			b.ManualHasSeriousError = true
+
+		} else if utils.IsBigIntZero(bundle.RewardDivGasUsed) { // 0 fee
+			bundle.Is0EffectiveGasPrice = true
+			msg := fmt.Sprintf("bundle %d has 0 effective-gas-price\n", bundle.Index)
+			b.AddError(msg)
+			b.ErrorCounter.BundleHas0Fee += 1
+			b.HasBundleWith0EffectiveGasPrice = true
+			b.ManualHasSeriousError = true
+
+		} else if bundle.RewardDivGasUsed.Cmp(lowestGasPrice) == -1 { // lower fee than lowest non-fb TX
+			bundle.IsPayingLessThanLowestTx = true
+
 			// calculate percent difference:
 			fCur := new(big.Float).SetInt(bundle.RewardDivGasUsed)
 			fLow := new(big.Float).SetInt(lowestGasPrice)
@@ -311,16 +339,15 @@ func (b *BlockCheck) Check() {
 			diffPercent2 := new(big.Float).Sub(big.NewFloat(1), diffPercent1)
 			diffPercent := new(big.Float).Mul(diffPercent2, big.NewFloat(100))
 
-			msg := fmt.Sprintf("bundle %d has %s%s lower effective-gas-price (%v) than [lowest non-fb transaction](<https://etherscan.io/address/%s>) (%v)\n", bundle.Index, diffPercent.Text('f', 2), "%", common.BigIntToEString(bundle.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4))
+			msg := fmt.Sprintf("bundle %d has %s%s lower effective-gas-price (%v) than [lowest non-fb transaction](<https://etherscan.io/tx/%s>) (%v)\n", bundle.Index, diffPercent.Text('f', 2), "%", common.BigIntToEString(bundle.RewardDivGasUsed, 4), lowestGasPriceTxHash, common.BigIntToEString(lowestGasPrice, 4))
 			b.AddError(msg)
 			b.ErrorCounter.BundleHasLowerFeeThanLowestNonFbTx += 1
-			bundle.IsPayingLessThanLowestTx = true
 			b.BundleIsPayingLessThanLowestTxPercentDiff, _ = diffPercent.Float32()
 		}
 	}
 }
 
-func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
+func (b *BlockCheck) SprintHeader(color bool, markdown bool) (msg string) {
 	minerAddr, found := AddressLookup.GetAddressDetail(b.Miner)
 	minerStr := fmt.Sprintf("[%s](<https://etherscan.io/address/%s>)", b.Miner, b.Miner)
 	if found {
@@ -328,10 +355,15 @@ func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
 	}
 
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, b.Number, b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, b.Number, b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
 	} else {
-		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d\n", b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
 	}
+	return msg
+}
+
+func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
+	msg = b.SprintHeader(color, markdown) + "\n"
 
 	// Print errors
 	for _, err := range b.Errors {

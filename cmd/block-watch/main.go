@@ -141,7 +141,14 @@ func watch(client *ethclient.Client) {
 								print(msg)
 
 								if sendErrorsToDiscord {
-									SendToDiscord(check.Sprint(false, true))
+									if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {
+										// Short message if only 1 error and that is a 0-effective-gas-price
+										msg := check.SprintHeader(false, true)
+										msg += " - " + check.Errors[0]
+										SendToDiscord(msg)
+									} else {
+										SendToDiscord(check.Sprint(false, true))
+									}
 								}
 								fmt.Println("")
 							} else if check.HasLessSeriousErrors() { // less serious errors are only counted
@@ -178,6 +185,8 @@ func AddErrorCountsToMinerErrors(check *blockcheck.BlockCheck) {
 	MinerErrors[check.Miner].ErrorCounts.FailedFlashbotsTx += check.ErrorCounter.FailedFlashbotsTx
 	MinerErrors[check.Miner].ErrorCounts.BundlePaysMoreThanPrevBundle += check.ErrorCounter.BundlePaysMoreThanPrevBundle
 	MinerErrors[check.Miner].ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx += check.ErrorCounter.BundleHasLowerFeeThanLowestNonFbTx
+	MinerErrors[check.Miner].ErrorCounts.BundleHas0Fee += check.ErrorCounter.BundleHas0Fee
+	MinerErrors[check.Miner].ErrorCounts.BundleHasNegativeFee += check.ErrorCounter.BundleHasNegativeFee
 }
 
 func PrintMinerErrors() {
@@ -186,7 +195,7 @@ func PrintMinerErrors() {
 		if v.MinerName != "" {
 			minerInfo += fmt.Sprintf(" (%s)", v.MinerName)
 		}
-		fmt.Printf("%-66s blocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx)
+		fmt.Printf("%-66s blocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, v.ErrorCounts.BundleHas0Fee, v.ErrorCounts.BundleHasNegativeFee)
 	}
 }
 
