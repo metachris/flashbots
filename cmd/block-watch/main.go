@@ -129,7 +129,7 @@ func watch(client *ethclient.Client) {
 					check, err := blockcheck.CheckBlock(blockFromBacklog)
 					if err != nil {
 						log.Println("CheckBlock from backlog error:", err, "block:", blockFromBacklog.Block.Number())
-						return
+						break
 					}
 
 					// no checking error, can process and remove from backlog
