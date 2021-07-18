@@ -84,6 +84,7 @@ func main() {
 	}
 
 	if *watchPtr {
+		log.Println("Start watching...")
 		watch(client)
 	}
 }
@@ -147,7 +148,7 @@ func watch(client *ethclient.Client) {
 								if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {
 									// Short message if only 1 error and that is a 0-effective-gas-price
 									msg := check.SprintHeader(false, true)
-									msg += " - " + check.Errors[0]
+									msg += " - Error: " + check.Errors[0]
 									SendToDiscord(msg)
 								} else {
 									SendToDiscord(check.Sprint(false, true))

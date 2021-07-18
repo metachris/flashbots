@@ -10,8 +10,8 @@ go run cmd/block-watch/*.go -block 12699873
 # Failed Flashbots tx:
 go run cmd/block-watch/*.go -block 12705543 
 
-# Failed 0-gas tx:
-go run cmd/block-watch/*.go -block 12701683
+# Failed 0-gas-and-data (non-fb) tx:
+go run cmd/block-watch/*.go -block 12605331
 ```
 
 
@@ -19,4 +19,3 @@ go run cmd/block-watch/*.go -block 12701683
 
 * ErrorCount struct method to add counts of another ErrorCount struct to self
 * discord.go should just accept a blockcheck struct and create the right message there
-

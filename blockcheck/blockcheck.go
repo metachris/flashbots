@@ -351,11 +351,11 @@ func (b *BlockCheck) SprintHeader(color bool, markdown bool) (msg string) {
 	minerAddr, found := AddressLookup.GetAddressDetail(b.Miner)
 	minerStr := fmt.Sprintf("[%s](<https://etherscan.io/address/%s>)", b.Miner, b.Miner)
 	if found {
-		minerStr += fmt.Sprintf(" (%s)", minerAddr.Name)
+		minerStr = fmt.Sprintf("[%s](<https://etherscan.io/address/%s>)", minerAddr.Name, b.Miner)
 	}
 
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle-explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, b.Number, b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner: %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, b.Number, b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
 	} else {
 		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
 	}
@@ -363,7 +363,11 @@ func (b *BlockCheck) SprintHeader(color bool, markdown bool) (msg string) {
 }
 
 func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
-	msg = b.SprintHeader(color, markdown) + "\n"
+	msg = b.SprintHeader(color, markdown)
+	if b.HasFailed0GasTx || b.HasFailedFlashbotsTx {
+		msg += " (ping @botcmiller)"
+	}
+	msg += "\n"
 
 	// Print errors
 	for _, err := range b.Errors {
@@ -437,18 +441,22 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 		}
 
 		if utils.IsBigIntZero(tx.GasPrice()) && len(tx.Data()) > 0 {
-			if receipt.Status == 0 { // successful tx
+			if receipt.Status == 0 { // failed tx
 				if _, exists := b.FailedTx[tx.Hash().String()]; exists {
 					// Already known (Flashbots TX)
 					continue
 				}
 
 				from, _ := utils.GetTxSender(tx)
+				to := ""
+				if tx.To() != nil {
+					to = tx.To().String()
+				}
 				b.FailedTx[tx.Hash().String()] = &FailedTx{
 					Hash:        tx.Hash().String(),
 					IsFlashbots: false,
 					From:        from.String(),
-					To:          tx.To().String(),
+					To:          to,
 					Block:       uint64(b.Number),
 				}
 
