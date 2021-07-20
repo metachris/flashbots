@@ -35,6 +35,15 @@ type ErrorCounts struct {
 	BundleHasNegativeFee               uint64
 }
 
+func (ec *ErrorCounts) Add(counts ErrorCounts) {
+	ec.FailedFlashbotsTx += counts.FailedFlashbotsTx
+	ec.Failed0GasTx += counts.Failed0GasTx
+	ec.BundlePaysMoreThanPrevBundle += counts.BundlePaysMoreThanPrevBundle
+	ec.BundleHasLowerFeeThanLowestNonFbTx += counts.BundleHasLowerFeeThanLowestNonFbTx
+	ec.BundleHas0Fee += counts.BundleHas0Fee
+	ec.BundleHasNegativeFee += counts.BundleHasNegativeFee
+}
+
 type BlockCheck struct {
 	Number    int64
 	Miner     string

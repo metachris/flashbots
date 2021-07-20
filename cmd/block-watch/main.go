@@ -28,16 +28,7 @@ var sendErrorsToDiscord bool
 // Backlog of new blocks that are not yet present in the mev-blocks API (it has ~5 blocks delay)
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
 
-// Counts of errors per miner
-type MinerErrorCount struct {
-	ErrorCounts blockcheck.ErrorCounts
-
-	MinerHash string
-	MinerName string
-	Blocks    map[int64]bool
-}
-
-var MinerErrors map[string]*MinerErrorCount = make(map[string]*MinerErrorCount)
+var minerErrors map[string]*blockcheck.MinerErrorCounter = make(map[string]*blockcheck.MinerErrorCounter)
 
 func main() {
 	log.SetOutput(os.Stdout)
@@ -174,25 +165,20 @@ func watch(client *ethclient.Client) {
 }
 
 func AddErrorCountsToMinerErrors(check *blockcheck.BlockCheck) {
-	_, found := MinerErrors[check.Miner]
+	_, found := minerErrors[check.Miner]
 	if !found {
-		MinerErrors[check.Miner] = &MinerErrorCount{
+		minerErrors[check.Miner] = &blockcheck.MinerErrorCounter{
 			MinerHash: check.Miner,
 			MinerName: check.MinerName,
 			Blocks:    make(map[int64]bool),
 		}
 	}
-	MinerErrors[check.Miner].Blocks[check.Number] = true
-	MinerErrors[check.Miner].ErrorCounts.Failed0GasTx += check.ErrorCounter.Failed0GasTx
-	MinerErrors[check.Miner].ErrorCounts.FailedFlashbotsTx += check.ErrorCounter.FailedFlashbotsTx
-	MinerErrors[check.Miner].ErrorCounts.BundlePaysMoreThanPrevBundle += check.ErrorCounter.BundlePaysMoreThanPrevBundle
-	MinerErrors[check.Miner].ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx += check.ErrorCounter.BundleHasLowerFeeThanLowestNonFbTx
-	MinerErrors[check.Miner].ErrorCounts.BundleHas0Fee += check.ErrorCounter.BundleHas0Fee
-	MinerErrors[check.Miner].ErrorCounts.BundleHasNegativeFee += check.ErrorCounter.BundleHasNegativeFee
+
+	minerErrors[check.Miner].AddErrorCounts(check.Number, check.ErrorCounter)
 }
 
 func PrintMinerErrors() {
-	for k, v := range MinerErrors {
+	for k, v := range minerErrors {
 		minerInfo := k
 		if v.MinerName != "" {
 			minerInfo += fmt.Sprintf(" (%s)", v.MinerName)
