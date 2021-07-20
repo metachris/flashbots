@@ -1,4 +1,4 @@
-// package blockcheck
+package blockcheck
 
 // import (
 // 	"time"

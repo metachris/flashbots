@@ -28,7 +28,8 @@ var sendErrorsToDiscord bool
 // Backlog of new blocks that are not yet present in the mev-blocks API (it has ~5 blocks delay)
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
 
-var minerErrors map[string]*blockcheck.MinerErrorCounter = make(map[string]*blockcheck.MinerErrorCounter)
+var minerErrors map[string]*blockcheck.MinerErrors = make(map[string]*blockcheck.MinerErrors)
+var lastSummarySentToDiscord time.Time = time.Unix(0, 0)
 
 func main() {
 	log.SetOutput(os.Stdout)
@@ -135,25 +136,53 @@ func watch(client *ethclient.Client) {
 							msg := check.Sprint(true, false)
 							print(msg)
 
-							if sendErrorsToDiscord {
-								if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {
-									// Short message if only 1 error and that is a 0-effective-gas-price
-									msg := check.SprintHeader(false, true)
-									msg += " - Error: " + check.Errors[0]
-									SendToDiscord(msg)
-								} else {
-									SendToDiscord(check.Sprint(false, true))
-								}
-							}
+							// if sendErrorsToDiscord {
+							// 	if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {
+							// 		// Short message if only 1 error and that is a 0-effective-gas-price
+							// 		msg := check.SprintHeader(false, true)
+							// 		msg += " - Error: " + check.Errors[0]
+							// 		SendToDiscord(msg)
+							// 	} else {
+							// 		SendToDiscord(check.Sprint(false, true))
+							// 	}
+							// }
 							fmt.Println("")
 						} else if check.HasLessSeriousErrors() { // less serious errors are only counted
 							errorCountNonSerious += 1
+						}
+
+						if sendErrorsToDiscord && (check.HasFailed0GasTx || check.HasFailedFlashbotsTx) {
+							SendToDiscord(check.Sprint(false, true))
 						}
 
 						if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
 							fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
 							AddErrorCountsToMinerErrors(check)
 							PrintMinerErrors()
+						}
+					}
+
+					// -------- Send daily summary to Discord ---------
+					if sendErrorsToDiscord {
+						// Check if it's time to send to Discord: first block after 3pm ET (7pm UTC)
+						// triggerHourUtc := 19
+
+						now := time.Now()
+						// dateLastSent := lastSummarySentToDiscord.Format("01-02-2006")
+						// dateToday := now.Format("01-02-2006")
+
+						// For testing, send all 5 minutes
+						if time.Since(lastSummarySentToDiscord).Hours() > 3 {
+							// if dateToday != dateLastSent && now.UTC().Hour() == triggerHourUtc {
+							lastSummarySentToDiscord = now
+							log.Println("Sending summary to Discord:")
+							msg := SprintMinerErrors()
+							fmt.Println(msg)
+							SendToDiscord(msg)
+
+							// Reset errors
+							minerErrors = make(map[string]*blockcheck.MinerErrors)
+							log.Println("Done, errors are reset.")
 						}
 					}
 
@@ -167,7 +196,7 @@ func watch(client *ethclient.Client) {
 func AddErrorCountsToMinerErrors(check *blockcheck.BlockCheck) {
 	_, found := minerErrors[check.Miner]
 	if !found {
-		minerErrors[check.Miner] = &blockcheck.MinerErrorCounter{
+		minerErrors[check.Miner] = &blockcheck.MinerErrors{
 			MinerHash: check.Miner,
 			MinerName: check.MinerName,
 			Blocks:    make(map[int64]bool),
@@ -177,12 +206,17 @@ func AddErrorCountsToMinerErrors(check *blockcheck.BlockCheck) {
 	minerErrors[check.Miner].AddErrorCounts(check.Number, check.ErrorCounter)
 }
 
-func PrintMinerErrors() {
+func SprintMinerErrors() (ret string) {
 	for k, v := range minerErrors {
 		minerInfo := k
 		if v.MinerName != "" {
 			minerInfo += fmt.Sprintf(" (%s)", v.MinerName)
 		}
-		fmt.Printf("%-66s blocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, v.ErrorCounts.BundleHas0Fee, v.ErrorCounts.BundleHasNegativeFee)
+		ret += fmt.Sprintf("%-66s errorBlocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, v.ErrorCounts.BundleHas0Fee, v.ErrorCounts.BundleHasNegativeFee)
 	}
+	return ret
+}
+
+func PrintMinerErrors() {
+	fmt.Print(SprintMinerErrors())
 }

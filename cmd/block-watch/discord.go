@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/metachris/flashbots/blockcheck"
 )
@@ -28,8 +30,13 @@ func SendToDiscord(msg string) error {
 		return errors.New("no DISCORD_WEBHOOK env variable found")
 	}
 
+	// Trim msg to 2k characters if necessary
 	if len(msg) > 2000 {
-		msg = msg[0:1994] + "...```"
+		if strings.Contains(msg, "```") {
+			msg = msg[0:1994] + "...```"
+		} else {
+			msg = msg[0:1997] + "..."
+		}
 	}
 
 	discordPayload := DiscordWebhookPayload{Content: msg}
@@ -44,6 +51,12 @@ func SendToDiscord(msg string) error {
 	}
 
 	defer res.Body.Close()
-	fmt.Println("response Status:", res.Status)
+	log.Println("response status:", res.Status)
+
+	if res.StatusCode >= 300 {
+		bodyBytes, _ := ioutil.ReadAll(res.Body)
+		bodyString := string(bodyBytes)
+		log.Println(bodyString)
+	}
 	return nil
 }
