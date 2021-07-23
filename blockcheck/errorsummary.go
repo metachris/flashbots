@@ -1,22 +1,20 @@
-package main
+package blockcheck
 
 import (
 	"fmt"
 	"sort"
 	"time"
-
-	"github.com/metachris/flashbots/blockcheck"
 )
 
 type ErrorSummary struct {
 	TimeStarted time.Time
-	MinerErrors map[string]*blockcheck.MinerErrors
+	MinerErrors map[string]*MinerErrors
 }
 
 func NewErrorSummary() ErrorSummary {
 	return ErrorSummary{
 		TimeStarted: time.Now(),
-		MinerErrors: make(map[string]*blockcheck.MinerErrors),
+		MinerErrors: make(map[string]*MinerErrors),
 	}
 }
 
@@ -41,10 +39,10 @@ func (es *ErrorSummary) String() (ret string) {
 	return ret
 }
 
-func (es *ErrorSummary) AddErrorCounts(MinerHash string, MinerName string, block int64, errors blockcheck.ErrorCounts) {
+func (es *ErrorSummary) AddErrorCounts(MinerHash string, MinerName string, block int64, errors ErrorCounts) {
 	_, found := es.MinerErrors[MinerHash]
 	if !found {
-		es.MinerErrors[MinerHash] = &blockcheck.MinerErrors{
+		es.MinerErrors[MinerHash] = &MinerErrors{
 			MinerHash: MinerHash,
 			MinerName: MinerName,
 			Blocks:    make(map[int64]bool),
@@ -57,11 +55,11 @@ func (es *ErrorSummary) AddErrorCounts(MinerHash string, MinerName string, block
 	}
 }
 
-func (es *ErrorSummary) AddCheckErrors(check *blockcheck.BlockCheck) {
+func (es *ErrorSummary) AddCheckErrors(check *BlockCheck) {
 	es.AddErrorCounts(check.Miner, check.MinerName, check.Number, check.ErrorCounter)
 }
 
 func (es *ErrorSummary) Reset() {
 	es.TimeStarted = time.Now()
-	es.MinerErrors = make(map[string]*blockcheck.MinerErrors)
+	es.MinerErrors = make(map[string]*MinerErrors)
 }

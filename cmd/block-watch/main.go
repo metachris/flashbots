@@ -28,11 +28,8 @@ var sendErrorsToDiscord bool
 // Backlog of new blocks that are not yet present in the mev-blocks API (it has ~5 blocks delay)
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
 
-// var minerErrors map[string]*blockcheck.MinerErrors = make(map[string]*blockcheck.MinerErrors)
-// var lastSummarySentToDiscord time.Time = time.Unix(0, 0)
-
-var dailyErrorSummary ErrorSummary = NewErrorSummary()
-var weeklyErrorSummary ErrorSummary = NewErrorSummary()
+var dailyErrorSummary blockcheck.ErrorSummary = blockcheck.NewErrorSummary()
+var weeklyErrorSummary blockcheck.ErrorSummary = blockcheck.NewErrorSummary()
 
 func main() {
 	log.SetOutput(os.Stdout)
