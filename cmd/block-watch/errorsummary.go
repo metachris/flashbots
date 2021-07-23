@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/metachris/flashbots/blockcheck"
@@ -20,12 +21,22 @@ func NewErrorSummary() ErrorSummary {
 }
 
 func (es *ErrorSummary) String() (ret string) {
-	for k, v := range es.MinerErrors {
-		minerInfo := k
-		if v.MinerName != "" {
-			minerInfo += fmt.Sprintf(" (%s)", v.MinerName)
+	// Get list of keys by number of errorBlocks
+	keys := make([]string, 0, len(es.MinerErrors))
+	for k := range es.MinerErrors {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return len(es.MinerErrors[keys[i]].Blocks) > len(es.MinerErrors[keys[j]].Blocks)
+	})
+
+	for _, key := range keys {
+		minerErrors := es.MinerErrors[key]
+		minerId := key
+		if minerErrors.MinerName != "" {
+			minerId += fmt.Sprintf(" (%s)", minerErrors.MinerName)
 		}
-		ret += fmt.Sprintf("%-66s errorBlocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, v.ErrorCounts.BundleHas0Fee, v.ErrorCounts.BundleHasNegativeFee)
+		ret += fmt.Sprintf("%-66s errorBlocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerId, len(minerErrors.Blocks), minerErrors.ErrorCounts.Failed0GasTx, minerErrors.ErrorCounts.FailedFlashbotsTx, minerErrors.ErrorCounts.BundlePaysMoreThanPrevBundle, minerErrors.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, minerErrors.ErrorCounts.BundleHas0Fee, minerErrors.ErrorCounts.BundleHasNegativeFee)
 	}
 	return ret
 }

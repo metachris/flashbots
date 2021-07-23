@@ -161,7 +161,7 @@ func watch(client *ethclient.Client) {
 
 						// Count errors
 						if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
-							fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
+							log.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
 							weeklyErrorSummary.AddCheckErrors(check)
 							dailyErrorSummary.AddCheckErrors(check)
 							fmt.Println(dailyErrorSummary.String())
@@ -189,7 +189,7 @@ func watch(client *ethclient.Client) {
 
 					// Weekly summary on Friday at 10am ET
 					weeklySummaryTriggerHourUtc := 14 // 10am ET
-					if now.UTC().Weekday() == time.Friday && now.UTC().Hour() == weeklySummaryTriggerHourUtc && time.Since(dailyErrorSummary.TimeStarted).Hours() >= 2 {
+					if now.UTC().Weekday() == time.Friday && now.UTC().Hour() == weeklySummaryTriggerHourUtc && time.Since(weeklyErrorSummary.TimeStarted).Hours() >= 2 {
 						log.Println("trigger weekly summary")
 						if sendErrorsToDiscord {
 							msg := weeklyErrorSummary.String()

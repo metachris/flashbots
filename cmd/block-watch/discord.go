@@ -65,7 +65,7 @@ func _SendToDiscord(msg string) error {
 	}
 
 	defer res.Body.Close()
-	log.Println("response status:", res.Status)
+	log.Println("Discord response status:", res.Status)
 
 	if res.StatusCode >= 300 {
 		bodyBytes, _ := ioutil.ReadAll(res.Body)
