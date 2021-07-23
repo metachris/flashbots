@@ -17,19 +17,40 @@ type DiscordWebhookPayload struct {
 	Content string `json:"content"`
 }
 
+var discordUrl string = os.Getenv("DISCORD_WEBHOOK")
+
+// SendToDiscord splits one message into multiple if necessary (max size is 2k characters)
 func SendToDiscord(msg string) error {
-	url := os.Getenv("DISCORD_WEBHOOK")
-	if len(url) == 0 {
-		return errors.New("no DISCORD_WEBHOOK env variable found")
+	if msg == "" {
+		return nil
 	}
 
-	// Trim msg to 2k characters if necessary
-	if len(msg) > 2000 {
-		if strings.Contains(msg, "```") {
-			msg = msg[0:1994] + "...```"
-		} else {
-			msg = msg[0:1997] + "..."
+	for {
+		if len(msg) < 2000 {
+			return _SendToDiscord(msg)
 		}
+
+		// Extract 2k of message and send those
+		smallMsg := ""
+		if strings.Contains(msg, "```") {
+			smallMsg = msg[0:1994] + "...```"
+			msg = "```..." + msg[1994:]
+		} else {
+			smallMsg = msg[0:1997] + "..."
+			msg = "..." + msg[1997:]
+		}
+
+		err := _SendToDiscord(smallMsg)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// _SendToDiscord sends to discord without any error checks
+func _SendToDiscord(msg string) error {
+	if len(discordUrl) == 0 {
+		return errors.New("no DISCORD_WEBHOOK env variable found")
 	}
 
 	discordPayload := DiscordWebhookPayload{Content: msg}
@@ -38,7 +59,7 @@ func SendToDiscord(msg string) error {
 		return err
 	}
 
-	res, err := http.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
+	res, err := http.Post(discordUrl, "application/json", bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return err
 	}

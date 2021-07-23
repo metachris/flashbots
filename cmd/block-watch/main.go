@@ -28,11 +28,11 @@ var sendErrorsToDiscord bool
 // Backlog of new blocks that are not yet present in the mev-blocks API (it has ~5 blocks delay)
 var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*blockswithtx.BlockWithTxReceipts)
 
-var minerErrors map[string]*blockcheck.MinerErrors = make(map[string]*blockcheck.MinerErrors)
-var lastSummarySentToDiscord time.Time = time.Unix(0, 0)
+// var minerErrors map[string]*blockcheck.MinerErrors = make(map[string]*blockcheck.MinerErrors)
+// var lastSummarySentToDiscord time.Time = time.Unix(0, 0)
 
-// var dailyErrorSummary ErrorSummary = NewErrorSummary()
-// var weeklyErrorSummary ErrorSummary = NewErrorSummary()
+var dailyErrorSummary ErrorSummary = NewErrorSummary()
+var weeklyErrorSummary ErrorSummary = NewErrorSummary()
 
 func main() {
 	log.SetOutput(os.Stdout)
@@ -154,74 +154,82 @@ func watch(client *ethclient.Client) {
 							errorCountNonSerious += 1
 						}
 
+						// Send failed TX to Discord
 						if sendErrorsToDiscord && (check.HasFailed0GasTx || check.HasFailedFlashbotsTx) {
 							SendToDiscord(check.Sprint(false, true, false))
 						}
 
+						// Count errors
 						if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
 							fmt.Printf("stats - 50p_errors: %d, 25p_errors: %d\n", errorCountSerious, errorCountNonSerious)
-							AddErrorCountsToMinerErrors(check)
-							PrintMinerErrors()
+							weeklyErrorSummary.AddCheckErrors(check)
+							dailyErrorSummary.AddCheckErrors(check)
+							fmt.Println(dailyErrorSummary.String())
 						}
 					}
 
-					// -------- Send daily summary to Discord ---------
-					if sendErrorsToDiscord {
-						// Check if it's time to send to Discord: first block after 3pm ET (7pm UTC)
-						// triggerHourUtc := 19
+					// IS IT TIME TO RESET DAILY & WEEKLY ERRORS?
+					now := time.Now()
 
-						now := time.Now()
-						// dateLastSent := lastSummarySentToDiscord.Format("01-02-2006")
-						// dateToday := now.Format("01-02-2006")
-
-						// For testing, send at specific interval
-						if time.Since(lastSummarySentToDiscord).Hours() >= 24 {
-							// if dateToday != dateLastSent && now.UTC().Hour() == triggerHourUtc {
-							lastSummarySentToDiscord = now
-							log.Println("Sending summary to Discord:")
-							msg := SprintMinerErrors()
+					// Daily summary at 3pm ET
+					dailySummaryTriggerHourUtc := 19 // 3pm ET
+					if now.UTC().Hour() == dailySummaryTriggerHourUtc && time.Since(dailyErrorSummary.TimeStarted).Hours() >= 2 {
+						log.Println("trigger daily summary")
+						if sendErrorsToDiscord {
+							msg := dailyErrorSummary.String()
 							if msg != "" {
 								fmt.Println(msg)
-								SendToDiscord("```" + msg + "```")
+								SendToDiscord("Daily miner summary: ```" + msg + "```")
 							}
-
-							// Reset errors
-							minerErrors = make(map[string]*blockcheck.MinerErrors)
-							log.Println("Done, errors are reset.")
 						}
+
+						// reset daily summery
+						dailyErrorSummary.Reset()
 					}
+
+					// Weekly summary on Friday at 10am ET
+					weeklySummaryTriggerHourUtc := 14 // 10am ET
+					if now.UTC().Weekday() == time.Friday && now.UTC().Hour() == weeklySummaryTriggerHourUtc && time.Since(dailyErrorSummary.TimeStarted).Hours() >= 2 {
+						log.Println("trigger weekly summary")
+						if sendErrorsToDiscord {
+							msg := weeklyErrorSummary.String()
+							if msg != "" {
+								fmt.Println(msg)
+								SendToDiscord("Weekly miner summary: ```" + msg + "```")
+							}
+						}
+
+						// reset weekly summery
+						weeklyErrorSummary.Reset()
+					}
+
+					// // -------- Send daily summary to Discord ---------
+					// if sendErrorsToDiscord {
+					// 	// Check if it's time to send to Discord: first block after 3pm ET (7pm UTC)
+					// 	// triggerHourUtc := 19
+
+					// 	// dateLastSent := lastSummarySentToDiscord.Format("01-02-2006")
+					// 	// dateToday := now.Format("01-02-2006")
+
+					// 	// For testing, send at specific interval
+					// 	if time.Since(dailyErrorSummary.TimeStarted).Hours() >= 3 {
+					// 		// if dateToday != dateLastSent && now.UTC().Hour() == triggerHourUtc {
+					// 		log.Println("Sending summary to Discord:")
+					// 		msg := dailyErrorSummary.String()
+					// 		if msg != "" {
+					// 			fmt.Println(msg)
+					// 			SendToDiscord("```" + msg + "```")
+					// 		}
+
+					// 		// Reset errors
+					// 		dailyErrorSummary.Reset()
+					// 		log.Println("Done, errors are reset.")
+					// 	}
+					// }
 
 					time.Sleep(1 * time.Second)
 				}
 			}
 		}
 	}
-}
-
-func AddErrorCountsToMinerErrors(check *blockcheck.BlockCheck) {
-	_, found := minerErrors[check.Miner]
-	if !found {
-		minerErrors[check.Miner] = &blockcheck.MinerErrors{
-			MinerHash: check.Miner,
-			MinerName: check.MinerName,
-			Blocks:    make(map[int64]bool),
-		}
-	}
-
-	minerErrors[check.Miner].AddErrorCounts(check.Number, check.ErrorCounter)
-}
-
-func SprintMinerErrors() (ret string) {
-	for k, v := range minerErrors {
-		minerInfo := k
-		if v.MinerName != "" {
-			minerInfo += fmt.Sprintf(" (%s)", v.MinerName)
-		}
-		ret += fmt.Sprintf("%-66s errorBlocks=%d \t failed0gas=%d \t failedFbTx=%d \t bundlePaysMore=%d \t bundleTooLowFee=%d \t has0fee=%d \t hasNegativeFee=%d\n", minerInfo, len(v.Blocks), v.ErrorCounts.Failed0GasTx, v.ErrorCounts.FailedFlashbotsTx, v.ErrorCounts.BundlePaysMoreThanPrevBundle, v.ErrorCounts.BundleHasLowerFeeThanLowestNonFbTx, v.ErrorCounts.BundleHas0Fee, v.ErrorCounts.BundleHasNegativeFee)
-	}
-	return ret
-}
-
-func PrintMinerErrors() {
-	fmt.Print(SprintMinerErrors())
 }
