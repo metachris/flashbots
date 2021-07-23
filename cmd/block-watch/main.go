@@ -31,6 +31,9 @@ var BlockBacklog map[int64]*blockswithtx.BlockWithTxReceipts = make(map[int64]*b
 var minerErrors map[string]*blockcheck.MinerErrors = make(map[string]*blockcheck.MinerErrors)
 var lastSummarySentToDiscord time.Time = time.Unix(0, 0)
 
+// var dailyErrorSummary ErrorSummary = NewErrorSummary()
+// var weeklyErrorSummary ErrorSummary = NewErrorSummary()
+
 func main() {
 	log.SetOutput(os.Stdout)
 
@@ -71,7 +74,7 @@ func main() {
 		if err != nil {
 			fmt.Println("Check at height error:", err)
 		}
-		msg := check.Sprint(true, false)
+		msg := check.Sprint(true, false, true)
 		print(msg)
 	}
 
@@ -133,7 +136,7 @@ func watch(client *ethclient.Client) {
 					if check.HasErrors() {
 						if check.HasSeriousErrors() { // only serious errors are printed and sent to Discord
 							errorCountSerious += 1
-							msg := check.Sprint(true, false)
+							msg := check.Sprint(true, false, true)
 							print(msg)
 
 							// if sendErrorsToDiscord {
@@ -152,7 +155,7 @@ func watch(client *ethclient.Client) {
 						}
 
 						if sendErrorsToDiscord && (check.HasFailed0GasTx || check.HasFailedFlashbotsTx) {
-							SendToDiscord(check.Sprint(false, true))
+							SendToDiscord(check.Sprint(false, true, false))
 						}
 
 						if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors
@@ -171,14 +174,16 @@ func watch(client *ethclient.Client) {
 						// dateLastSent := lastSummarySentToDiscord.Format("01-02-2006")
 						// dateToday := now.Format("01-02-2006")
 
-						// For testing, send all 5 minutes
-						if time.Since(lastSummarySentToDiscord).Hours() > 3 {
+						// For testing, send at specific interval
+						if time.Since(lastSummarySentToDiscord).Hours() >= 24 {
 							// if dateToday != dateLastSent && now.UTC().Hour() == triggerHourUtc {
 							lastSummarySentToDiscord = now
 							log.Println("Sending summary to Discord:")
 							msg := SprintMinerErrors()
-							fmt.Println(msg)
-							SendToDiscord(msg)
+							if msg != "" {
+								fmt.Println(msg)
+								SendToDiscord("```" + msg + "```")
+							}
 
 							// Reset errors
 							minerErrors = make(map[string]*blockcheck.MinerErrors)

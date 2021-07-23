@@ -371,11 +371,8 @@ func (b *BlockCheck) SprintHeader(color bool, markdown bool) (msg string) {
 	return msg
 }
 
-func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
+func (b *BlockCheck) Sprint(color bool, markdown bool, includeBundles bool) (msg string) {
 	msg = b.SprintHeader(color, markdown)
-	if b.HasFailed0GasTx || b.HasFailedFlashbotsTx {
-		msg += " (ping @botcmiller)"
-	}
 	msg += "\n"
 
 	// Print errors
@@ -386,6 +383,10 @@ func (b *BlockCheck) Sprint(color bool, markdown bool) (msg string) {
 		} else {
 			msg += err
 		}
+	}
+
+	if !includeBundles {
+		return msg
 	}
 
 	if markdown {

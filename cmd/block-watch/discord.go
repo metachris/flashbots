@@ -11,17 +11,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/metachris/flashbots/blockcheck"
 )
 
 type DiscordWebhookPayload struct {
 	Content string `json:"content"`
-}
-
-func SendBundleOrderErrorToDiscord(b *blockcheck.BlockCheck) error {
-	msg := b.Sprint(false, true)
-	return SendToDiscord(msg)
 }
 
 func SendToDiscord(msg string) error {
