@@ -26,6 +26,8 @@ var ThresholdBundleIsPayingLessThanLowestTxPercentDiff float32 = 50
 var AddressLookup *addresslookup.AddressLookupService
 var AddressesUpdated time.Time
 
+var FlashbotsBlockCache map[int64]api.FlashbotsBlock = make(map[int64]api.FlashbotsBlock)
+
 type ErrorCounts struct {
 	FailedFlashbotsTx                  uint64
 	Failed0GasTx                       uint64
@@ -45,9 +47,10 @@ func (ec *ErrorCounts) Add(counts ErrorCounts) {
 }
 
 type BlockCheck struct {
-	Number    int64
-	Miner     string
-	MinerName string
+	Number           int64
+	Miner            string
+	MinerName        string
+	SkipFlashbotsApi bool
 
 	BlockWithTxReceipts   *blockswithtx.BlockWithTxReceipts
 	EthBlock              *types.Block
@@ -71,7 +74,7 @@ type BlockCheck struct {
 	ErrorCounter ErrorCounts
 }
 
-func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) (blockCheck *BlockCheck, err error) {
+func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts, skipFlashbotsApi bool) (blockCheck *BlockCheck, err error) {
 	// Init / update AddressLookup service
 	if AddressLookup == nil {
 		AddressLookup = addresslookup.NewAddressLookupService(nil)
@@ -97,6 +100,7 @@ func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) (blockCheck *Bloc
 		BlockWithTxReceipts:   blockWithTx,
 		EthBlock:              blockWithTx.Block,
 		FlashbotsTransactions: make([]api.FlashbotsTransaction, 0),
+		SkipFlashbotsApi:      skipFlashbotsApi,
 
 		Number:       blockWithTx.Block.Number().Int64(),
 		Miner:        blockWithTx.Block.Coinbase().Hex(),
@@ -109,6 +113,7 @@ func CheckBlock(blockWithTx *blockswithtx.BlockWithTxReceipts) (blockCheck *Bloc
 	if err != nil {
 		return blockCheck, err
 	}
+
 	check.CreateBundles()
 	check.Check()
 	return &check, nil
@@ -175,6 +180,21 @@ func (b *BlockCheck) AddBundle(bundle *common.Bundle) {
 }
 
 func (b *BlockCheck) QueryFlashbotsApi() error {
+	cachedBlock, found := FlashbotsBlockCache[b.Number]
+	if found {
+		// fmt.Println(11)
+		b.FlashbotsApiBlock = &cachedBlock
+		b.FlashbotsTransactions = b.FlashbotsApiBlock.Transactions
+		return nil
+	}
+
+	if b.SkipFlashbotsApi {
+		if b.FlashbotsApiBlock == nil {
+			b.FlashbotsApiBlock = &api.FlashbotsBlock{}
+		}
+		return nil
+	}
+
 	// API call to flashbots
 	opts := api.GetBlocksOptions{BlockNumber: b.Number}
 	flashbotsResponse, err := api.GetBlocks(&opts)
@@ -187,14 +207,14 @@ func (b *BlockCheck) QueryFlashbotsApi() error {
 		return ErrFlashbotsApiDoesntHaveThatBlockYet
 	}
 
+	// fmt.Println("22", b.Number, len(flashbotsResponse.Blocks))  // TODO
+
 	if len(flashbotsResponse.Blocks) != 1 {
 		return nil
 	}
 
 	b.FlashbotsApiBlock = &flashbotsResponse.Blocks[0]
 	b.FlashbotsTransactions = b.FlashbotsApiBlock.Transactions
-	b.CreateBundles()
-
 	return nil
 }
 
@@ -253,13 +273,12 @@ func (b *BlockCheck) IsFlashbotsTx(hash string) bool {
 
 // Check analyzes the Flashbots bundles and adds errors when issues are found
 func (b *BlockCheck) Check() {
+	// fmt.Println(b.Number, 1, b.FlashbotsApiBlock, len(b.FlashbotsTransactions))
 	numBundles := len(b.Bundles)
-
-	// TODO: Check uncle-bandit-attack
-	// b.BlockWithTxReceipts.Block.Uncles()
 
 	// Check 0: contains failed Flashbots or 0-gas tx
 	b.checkBlockForFailedTx()
+	// fmt.Println(b.Number, 2, len(b.Errors))
 
 	// Check 1: do all bundles exists or are there gaps?
 	for i := 0; i < numBundles; i++ {
@@ -267,6 +286,7 @@ func (b *BlockCheck) Check() {
 			b.AddError(fmt.Sprintf("- error: missing bundle # %d in block %d", i, b.Number))
 		}
 	}
+	// fmt.Println(b.Number, 3, len(b.Errors))
 
 	// Check 2: are the bundles in the correct order?
 	lastCoinbaseDivGasused := big.NewInt(-1)
@@ -301,6 +321,7 @@ func (b *BlockCheck) Check() {
 		lastCoinbaseDivGasused = bundle.CoinbaseDivGasUsed
 		lastRewardDivGasused = bundle.RewardDivGasUsed
 	}
+	// fmt.Println(b.Number, 4, len(b.Errors))
 
 	// Check 3: bundle effective gas price > lowest tx gas price
 	// step 1. find lowest non-fb-tx gas price
@@ -354,6 +375,7 @@ func (b *BlockCheck) Check() {
 			b.BundleIsPayingLessThanLowestTxPercentDiff, _ = diffPercent.Float32()
 		}
 	}
+	// fmt.Println(b.Number, 5, len(b.Errors))
 }
 
 func (b *BlockCheck) SprintHeader(color bool, markdown bool) (msg string) {
@@ -479,4 +501,70 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 	}
 
 	return failedTransactions
+}
+
+func CacheFlashbotsBlocks(startBlock int64, endBlock int64) error {
+	numBlocks := endBlock - startBlock
+	limit1 := int64(10_000)
+	if numBlocks < 10_000 {
+		limit1 = numBlocks
+	}
+
+	// API call to flashbots
+	opts := api.GetBlocksOptions{
+		Before: endBlock + 1,
+		Limit:  limit1,
+	}
+
+	flashbotsResponse, err := api.GetBlocks(&opts)
+	if err != nil {
+		return err
+	}
+
+	// Return an error if API doesn't have the block yet
+	if flashbotsResponse.LatestBlockNumber < endBlock {
+		return ErrFlashbotsApiDoesntHaveThatBlockYet
+	}
+
+	// Cache now
+	lowestBlock := endBlock
+	for _, block := range flashbotsResponse.Blocks {
+		FlashbotsBlockCache[block.BlockNumber] = block
+		if block.BlockNumber < lowestBlock {
+			lowestBlock = block.BlockNumber
+		}
+	}
+
+	// If necessary, fetch more
+	for {
+		// fmt.Println("check2. lowestCurrent:", lowestBlock, "start", startBlock)
+		if lowestBlock <= startBlock {
+			return nil
+		}
+
+		numBlocks = lowestBlock - startBlock
+		limit1 := int64(10_000)
+		if numBlocks < 10_000 {
+			limit1 = numBlocks
+		}
+
+		opts := api.GetBlocksOptions{
+			Before: lowestBlock,
+			Limit:  limit1,
+		}
+
+		flashbotsResponse, err = api.GetBlocks(&opts)
+		if err != nil {
+			return err
+		}
+
+		// fmt.Println("cached before", len(FlashbotsBlockCache))
+		for _, block := range flashbotsResponse.Blocks {
+			FlashbotsBlockCache[block.BlockNumber] = block
+			if block.BlockNumber < lowestBlock {
+				lowestBlock = block.BlockNumber
+			}
+		}
+		// fmt.Println("cached after", len(FlashbotsBlockCache))
+	}
 }

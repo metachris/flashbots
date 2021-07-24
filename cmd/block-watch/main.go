@@ -67,7 +67,7 @@ func main() {
 		utils.Perror(err)
 
 		// check the block
-		check, err := blockcheck.CheckBlock(block)
+		check, err := blockcheck.CheckBlock(block, false)
 		if err != nil {
 			fmt.Println("Check at height error:", err)
 		}
@@ -120,7 +120,7 @@ func watch(client *ethclient.Client) {
 						utils.PrintBlock(blockFromBacklog.Block)
 					}
 
-					check, err := blockcheck.CheckBlock(blockFromBacklog)
+					check, err := blockcheck.CheckBlock(blockFromBacklog, false)
 					if err != nil {
 						log.Println("CheckBlock from backlog error:", err, "block:", blockFromBacklog.Block.Number())
 						break
@@ -170,6 +170,7 @@ func watch(client *ethclient.Client) {
 
 					// Daily summary at 3pm ET
 					dailySummaryTriggerHourUtc := 19 // 3pm ET
+					// log.Println(now.UTC().Hour(), dailySummaryTriggerHourUtc, time.Since(dailyErrorSummary.TimeStarted).Hours())
 					if now.UTC().Hour() == dailySummaryTriggerHourUtc && time.Since(dailyErrorSummary.TimeStarted).Hours() >= 2 {
 						log.Println("trigger daily summary")
 						if sendErrorsToDiscord {
