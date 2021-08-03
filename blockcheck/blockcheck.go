@@ -69,7 +69,8 @@ type BlockCheck struct {
 	HasBundleWith0EffectiveGasPrice bool
 	HasFailedFlashbotsTx            bool
 	HasFailed0GasTx                 bool
-	ManualHasSeriousError           bool // manually set by specific error conditions
+
+	ManualHasSeriousError bool // manually set by specific error conditions
 
 	ErrorCounter ErrorCounts
 }

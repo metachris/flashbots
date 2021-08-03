@@ -7,9 +7,15 @@ import (
 	"strings"
 )
 
+const (
+	BundleTypeFlashbots = "flashbots"
+	BundleTypeRogue     = "rogue"
+)
+
 type FlashbotsTransaction struct {
 	Hash             string `json:"transaction_hash"`
 	TxIndex          int64  `json:"tx_index"`
+	BundleType       string `json:"bundle_type"`
 	BundleIndex      int64  `json:"bundle_index"`
 	BlockNumber      int64  `json:"block_number"`
 	EoaAddress       string `json:"eoa_address"`
