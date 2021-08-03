@@ -48,8 +48,6 @@ txs, err := GetTransactions(nil)
 
 ## Getting Started
 
-A good starting point is `cmd/block-watch/main.go`, which monitors blocks and bundles and reports issues:
-
-* Failed Flashbots (or other 0-gas) transaction
-* Bundle out of order by effective-gasprice
-* Bundle effective-gasprice is lower than lowest non-fb tx gasprice
+Good starting points:
+* `cmd/api-test/main.go`
+* `cmd/block-watch/main.go`

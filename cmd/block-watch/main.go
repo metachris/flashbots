@@ -152,7 +152,7 @@ func watch(client *ethclient.Client) {
 						}
 
 						// Send failed TX to Discord
-						if sendErrorsToDiscord && (check.HasFailed0GasTx || check.HasFailedFlashbotsTx) {
+						if sendErrorsToDiscord && check.TriggerAlertOnFailedTx {
 							SendToDiscord(check.Sprint(false, true, false))
 						}
 

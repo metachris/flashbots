@@ -70,7 +70,8 @@ type BlockCheck struct {
 	HasFailedFlashbotsTx            bool
 	HasFailed0GasTx                 bool
 
-	ManualHasSeriousError bool // manually set by specific error conditions
+	TriggerAlertOnFailedTx bool
+	ManualHasSeriousError  bool // manually set by specific error conditions
 
 	ErrorCounter ErrorCounts
 }
@@ -463,10 +464,13 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 				Block:       uint64(fbTx.BlockNumber),
 			}
 
-			msg := fmt.Sprintf("failed Flashbots tx [%s](<https://etherscan.io/tx/%s>) in bundle %d (from [%s](<https://etherscan.io/address/%s>))\n", fbTx.Hash, fbTx.Hash, fbTx.BundleIndex, fbTx.EoaAddress, fbTx.EoaAddress)
+			msg := fmt.Sprintf("failed %s tx [%s](<https://etherscan.io/tx/%s>) in bundle %d (from [%s](<https://etherscan.io/address/%s>))\n", fbTx.BundleType, fbTx.Hash, fbTx.Hash, fbTx.BundleIndex, fbTx.EoaAddress, fbTx.EoaAddress)
 			b.ErrorCounter.FailedFlashbotsTx += 1
 			b.AddError(msg)
 			b.HasFailedFlashbotsTx = true
+			if fbTx.BundleType == api.BundleTypeFlashbots { // alert only for type=flashbots
+				b.TriggerAlertOnFailedTx = true
+			}
 		}
 	}
 
@@ -501,6 +505,7 @@ func (b *BlockCheck) checkBlockForFailedTx() (failedTransactions []FailedTx) {
 				b.AddError(msg)
 				b.ErrorCounter.Failed0GasTx += 1
 				b.HasFailed0GasTx = true
+				b.TriggerAlertOnFailedTx = true
 			}
 		}
 	}
