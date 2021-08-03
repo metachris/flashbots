@@ -134,7 +134,7 @@ func watch(client *ethclient.Client) {
 						if check.HasSeriousErrors() { // only serious errors are printed and sent to Discord
 							errorCountSerious += 1
 							msg := check.Sprint(true, false, true)
-							print(msg)
+							fmt.Println(msg)
 
 							// if sendErrorsToDiscord {
 							// 	if len(check.Errors) == 1 && check.HasBundleWith0EffectiveGasPrice {

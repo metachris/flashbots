@@ -385,10 +385,14 @@ func (b *BlockCheck) SprintHeader(color bool, markdown bool) (msg string) {
 		minerStr = fmt.Sprintf("[%s](<https://etherscan.io/address/%s>)", minerAddr.Name, b.Miner)
 	}
 
+	numTx := len(b.BlockWithTxReceipts.Block.Transactions())
+	numFbTx := len(b.FlashbotsApiBlock.Transactions)
+	numBundles := len(b.Bundles)
+
 	if markdown {
-		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner: %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, b.Number, b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsApiBlock.Transactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block [%d](<https://etherscan.io/block/%d>) ([bundle explorer](<https://flashbots-explorer.marto.lol/?block=%d>)), miner: %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, b.Number, b.Number, minerStr, numTx, numFbTx, numBundles)
 	} else {
-		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, minerStr, len(b.BlockWithTxReceipts.Block.Transactions()), len(b.FlashbotsTransactions), len(b.Bundles))
+		msg = fmt.Sprintf("Block %d, miner %s - tx: %d, fb-tx: %d, bundles: %d", b.Number, minerStr, numTx, numFbTx, numBundles)
 	}
 	return msg
 }
