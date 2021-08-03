@@ -39,7 +39,6 @@ block, err := api.GetBlocks(nil)
 opts := api.GetBlocksOptions{BlockNumber: 12527162}
 block, err := api.GetBlocks(&opts)
 
-
 // Transactions API: default
 txs, err := GetTransactions(nil)
 ```
