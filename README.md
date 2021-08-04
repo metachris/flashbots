@@ -19,7 +19,26 @@ Reach out: [twitter.com/metachris](https://twitter.com/metachris)
 
 ---
 
-## Flashbots Blocks & Transactions API
+## Flashbots APIs
+
+### RPC: userstats, CallBundle
+
+https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint
+
+```bash
+go get github.com/metachris/flashbots/api/ethrpc
+```
+
+Usage:
+
+```go
+privateKey, _ := crypto.GenerateKey()
+result, err := rpcClient.FlashbotsGetUserStats(privateKey, 12960506)
+fmt.Println(result)
+```
+
+
+### Blocks & Transactions 
 
 https://blocks.flashbots.net/
 
