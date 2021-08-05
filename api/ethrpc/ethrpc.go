@@ -11,9 +11,9 @@ import (
 	"math/big"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -145,7 +145,7 @@ func (rpc *EthRPC) CallWithFlashbotsSignature(method string, privKey *ecdsa.Priv
 	}
 
 	hashedBody := crypto.Keccak256Hash([]byte(body)).Hex()
-	sig, err := crypto.Sign(crypto.Keccak256([]byte("\x19Ethereum Signed Message:\n"+strconv.Itoa(len(hashedBody))+hashedBody)), privKey)
+	sig, err := crypto.Sign(accounts.TextHash([]byte(hashedBody)), privKey)
 	if err != nil {
 		return nil, err
 	}
