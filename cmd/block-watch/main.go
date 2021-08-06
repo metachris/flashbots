@@ -20,6 +20,7 @@ import (
 	"github.com/metachris/flashbots/blockcheck"
 	"github.com/metachris/go-ethutils/blockswithtx"
 	"github.com/metachris/go-ethutils/utils"
+	"github.com/pkg/errors"
 )
 
 var silent bool
@@ -96,7 +97,11 @@ func watch(client *ethclient.Client) {
 		case header := <-headers:
 			// New block header received. Download block with tx-receipts
 			b, err := blockswithtx.GetBlockWithTxReceipts(client, header.Number.Int64())
-			utils.Perror(err)
+			if err != nil {
+				err = errors.Wrap(err, "error in GetBlockWithTxReceipts")
+				log.Printf("%+v\n", err)
+				continue
+			}
 
 			if !silent {
 				fmt.Println("Queueing new block", b.Block.Number())
