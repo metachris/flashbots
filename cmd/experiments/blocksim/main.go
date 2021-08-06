@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,42 +33,67 @@ var gethNode string = fbcommon.EnvStr("GETH_NODE", mevGethNode)
 // 12973113 0x2e5b87f68aeba0dfc1b4abb96fece3b396064a9b97eb03f739755ffb349f5149  tx: 177  error: #92, nonce too high
 
 func main() {
+	var err error
+
 	blockHash := flag.String("blockhash", "", "hash of block to simulate")
+	blockNumber := flag.Int64("blocknumber", 0, "number of block to simulate")
 	flag.Parse()
 	// fmt.Println(1, *bl)
-	if *blockHash == "" {
-		log.Fatal("No block hash given")
+	if *blockHash == "" && *blockNumber == 0 {
+		log.Fatal("No block given")
 	}
 
 	client, err := ethclient.Dial(gethNode)
 	utils.Perror(err)
 	fmt.Println("Connected to", gethNode)
 
-	hash := common.HexToHash(*blockHash)
-	block, err := client.BlockByHash(context.Background(), hash)
-	utils.Perror(err)
-	SimulateBlock(block)
+	var block *types.Block
+	if *blockHash != "" {
+		hash := common.HexToHash(*blockHash)
+		block, err = client.BlockByHash(context.Background(), hash)
+		utils.Perror(err)
+
+		err = SimulateBlock(block, 0)
+		if err != nil {
+			fmt.Println(err)
+		}
+		return
+
+	} else if *blockNumber > 0 {
+		block, err = client.BlockByNumber(context.Background(), big.NewInt(*blockNumber))
+		utils.Perror(err)
+
+		breakingTxIndex := FindBreakingTx(block)
+		if breakingTxIndex >= 0 {
+			fmt.Println("== breakingTxIndex:", breakingTxIndex, block.Transactions()[breakingTxIndex].Hash())
+			for i, v := range block.Transactions()[:breakingTxIndex+5] {
+				fmt.Println(i, v.Hash())
+			}
+		}
+	}
+	// SimulateBlock(block)
 }
 
-// func SimulateBlock(client *ethclient.Client, blockHash common.Hash) {
-func SimulateBlock(block *types.Block) {
+// numTx is the maximum number of tx to include (used for troubleshooting). default 0 (all transactions)
+func SimulateBlock(block *types.Block, maxTx int) error {
 	fmt.Printf("Simulating block %s 0x%x %s \t %d tx \t timestamp: %d\n", block.Number(), block.Number(), block.Header().Hash(), len(block.Transactions()), block.Header().Time)
 
 	txs := make([]string, 0)
-	for _, tx := range block.Transactions() {
+	for i, tx := range block.Transactions() {
 		if tx.Type() != 0 {
-			continue
+			fmt.Println("tx", i, "legacy")
+			// continue
 		}
 
 		rlp := fbcommon.TxToRlp(tx)
 		txs = append(txs, rlp)
 
-		// if len(txs) == 92 {
-		// 	break
-		// }
+		if maxTx > 0 && len(txs) == maxTx {
+			break
+		}
 	}
 
-	fmt.Printf("- %d tx sending for simulation to %s...\n", len(txs), mevGethNode)
+	fmt.Printf("sending %d tx for simulation to %s...\n", len(txs), mevGethNode)
 
 	param := ethrpc.FlashbotsCallBundleParam{
 		Txs:              txs,
@@ -80,8 +106,63 @@ func SimulateBlock(block *types.Block) {
 
 	privateKey, _ := crypto.GenerateKey()
 	result, err := rpcClient.FlashbotsCallBundle(privateKey, param)
-	utils.Perror(err)
+	if err != nil {
+		return err
+	}
+
 	// fmt.Println(result)
 	fmt.Println("Coinbase diff:", result.CoinbaseDiff)
+	return nil
+}
 
+// One tx breaks the simulation. Find the tx.
+func FindBreakingTx(block *types.Block) (breakingTxIndex int) {
+	var err error
+	numTransactions := len(block.Transactions()) // on first run, include all transactions
+	if numTransactions == 0 {
+		return -1
+	}
+
+	isFirst := true
+	// lastBroken := 0
+	lastStepSize := numTransactions
+	lastWorking := 0
+
+	for {
+		fmt.Println("")
+		if lastStepSize > 1 {
+			lastStepSize /= 2
+		}
+
+		// fmt.Println("\ntrying num tx:", numTransactions)
+		err = SimulateBlock(block, numTransactions)
+		hasError := err != nil
+
+		// fmt.Println(numTransactions, isFirst, hasError, err)
+		if isFirst && !hasError {
+			return -1 // block works as whole!
+		}
+		isFirst = false
+
+		if hasError {
+			fmt.Println(err)
+			if numTransactions < 2 {
+				fmt.Println(err)
+				return 0
+			}
+
+			if lastWorking == numTransactions-1 {
+				return numTransactions
+			}
+
+			// try with fewer transactrions
+			// lastBroken = numTransactions
+			numTransactions -= lastStepSize
+			continue
+		}
+
+		// no error. try with more
+		lastWorking = numTransactions
+		numTransactions += lastStepSize
+	}
 }
