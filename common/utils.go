@@ -73,7 +73,7 @@ func TimeStringToSec(s string) (timespanSec int, err error) {
 func TxToRlp(tx *types.Transaction) string {
 	var buff bytes.Buffer
 	tx.EncodeRLP(&buff)
-	return fmt.Sprintf("0x%x", buff.Bytes())
+	return fmt.Sprintf("%x", buff.Bytes())
 }
 
 func EnvStr(key string, defaultvalue string) string {

@@ -36,10 +36,10 @@ func main() {
 	var err error
 
 	blockHash := flag.String("blockhash", "", "hash of block to simulate")
-	blockNumber := flag.Int64("blocknumber", 0, "number of block to simulate")
+	blockNumber := flag.Int64("blocknumber", -1, "number of block to simulate")
 	flag.Parse()
 	// fmt.Println(1, *bl)
-	if *blockHash == "" && *blockNumber == 0 {
+	if *blockHash == "" && *blockNumber < 0 {
 		log.Fatal("No block given")
 	}
 
@@ -53,21 +53,27 @@ func main() {
 		block, err = client.BlockByHash(context.Background(), hash)
 		utils.Perror(err)
 
-		err = SimulateBlock(block, 0)
+		err = SimulateBlock(block, 0, true)
 		if err != nil {
 			fmt.Println(err)
 		}
 		return
 
-	} else if *blockNumber > 0 {
-		block, err = client.BlockByNumber(context.Background(), big.NewInt(*blockNumber))
-		utils.Perror(err)
+	} else {
+		if *blockNumber == 0 {
+			block, err = client.BlockByNumber(context.Background(), nil)
+		} else if *blockNumber > 0 {
+			block, err = client.BlockByNumber(context.Background(), big.NewInt(*blockNumber))
+		}
 
+		utils.Perror(err)
 		breakingTxIndex := FindBreakingTx(block)
 		if breakingTxIndex >= 0 {
-			fmt.Println("== breakingTxIndex:", breakingTxIndex, block.Transactions()[breakingTxIndex].Hash())
-			for i, v := range block.Transactions()[:breakingTxIndex+5] {
-				fmt.Println(i, v.Hash())
+			_tx := block.Transactions()[breakingTxIndex]
+			fmt.Println("\nblock", block.Number(), "has breaking tx at index", breakingTxIndex, _tx.Hash(), "- type:", _tx.Type())
+			fmt.Println("RLP:", fbcommon.TxToRlp(_tx))
+			for i, v := range block.Transactions()[:breakingTxIndex+1] {
+				fmt.Printf("%3d %s %d \n", i, v.Hash(), v.Type())
 			}
 		}
 	}
@@ -75,17 +81,26 @@ func main() {
 }
 
 // numTx is the maximum number of tx to include (used for troubleshooting). default 0 (all transactions)
-func SimulateBlock(block *types.Block, maxTx int) error {
-	fmt.Printf("Simulating block %s 0x%x %s \t %d tx \t timestamp: %d\n", block.Number(), block.Number(), block.Header().Hash(), len(block.Transactions()), block.Header().Time)
+func SimulateBlock(block *types.Block, maxTx int, debug bool) error {
+	if debug {
+		fmt.Printf("Simulating block %s 0x%x %s \t %d tx \t timestamp: %d\n", block.Number(), block.Number(), block.Header().Hash(), len(block.Transactions()), block.Header().Time)
+	}
 
 	txs := make([]string, 0)
-	for i, tx := range block.Transactions() {
-		if tx.Type() != 0 {
-			fmt.Println("tx", i, "legacy")
-			// continue
-		}
+	for _, tx := range block.Transactions() {
+		// fmt.Println("tx", i, tx.Hash(), "type", tx.Type())
 
 		rlp := fbcommon.TxToRlp(tx)
+
+		// Might need to strip beginning bytes
+		if rlp[:2] == "b9" {
+			rlp = rlp[6:]
+		} else if rlp[:2] == "b8" {
+			rlp = rlp[4:]
+		}
+
+		// callBundle expects a 0x prefix
+		rlp = "0x" + rlp
 		txs = append(txs, rlp)
 
 		if maxTx > 0 && len(txs) == maxTx {
@@ -93,7 +108,9 @@ func SimulateBlock(block *types.Block, maxTx int) error {
 		}
 	}
 
-	fmt.Printf("sending %d tx for simulation to %s...\n", len(txs), mevGethNode)
+	if debug {
+		fmt.Printf("sending %d tx for simulation to %s...\n", len(txs), mevGethNode)
+	}
 
 	param := ethrpc.FlashbotsCallBundleParam{
 		Txs:              txs,
@@ -124,35 +141,55 @@ func FindBreakingTx(block *types.Block) (breakingTxIndex int) {
 	}
 
 	isFirst := true
+	isSecond := false
 	// lastBroken := 0
 	lastStepSize := numTransactions
 	lastWorking := 0
 
 	for {
 		fmt.Println("")
+
+		// fmt.Println("\ntrying num tx:", numTransactions)
+		err = SimulateBlock(block, numTransactions, true)
+		hasError := err != nil
+
+		// fmt.Println(numTransactions, isFirst, hasError, err)
+		if isFirst { // first try: all
+			isFirst = false
+			isSecond = true
+
+			if hasError {
+				fmt.Println(err)
+				numTransactions = 1
+				continue
+			} else {
+				return -1 // block works as whole!
+			}
+		} else if isSecond { // second try: only 1 tx
+			if hasError {
+				fmt.Println(err)
+				return 0
+			}
+			isSecond = false
+			lastWorking = numTransactions
+			numTransactions = len(block.Transactions()) / 2
+			lastStepSize /= 2
+			continue
+		}
+
 		if lastStepSize > 1 {
 			lastStepSize /= 2
 		}
 
-		// fmt.Println("\ntrying num tx:", numTransactions)
-		err = SimulateBlock(block, numTransactions)
-		hasError := err != nil
-
-		// fmt.Println(numTransactions, isFirst, hasError, err)
-		if isFirst && !hasError {
-			return -1 // block works as whole!
-		}
-		isFirst = false
-
 		if hasError {
+			// fmt.Println(numTransactions, "stepsize", lastStepSize, err)
 			fmt.Println(err)
 			if numTransactions < 2 {
-				fmt.Println(err)
 				return 0
 			}
 
 			if lastWorking == numTransactions-1 {
-				return numTransactions
+				return numTransactions - 1
 			}
 
 			// try with fewer transactrions
