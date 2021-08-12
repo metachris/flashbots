@@ -332,10 +332,14 @@ type FlashbotsUserStats struct {
 }
 
 type FlashbotsCallBundleParam struct {
-	Txs              []string `json:"txs"`              // Array[String], A list of signed transactions to execute in an atomic bundle
-	BlockNumber      string   `json:"blockNumber"`      // String, a hex encoded block number for which this bundle is valid on
-	StateBlockNumber string   `json:"stateBlockNumber"` // String, either a hex encoded number or a block tag for which state to base this simulation on. Can use "latest"
-	Timestamp        int64    `json:"timestamp"`        // Number, the timestamp to use for this bundle simulation, in seconds since the unix epoch
+	Txs              []string `json:"txs"`                 // Array[String], A list of signed transactions to execute in an atomic bundle
+	BlockNumber      string   `json:"blockNumber"`         // String, a hex encoded block number for which this bundle is valid on
+	StateBlockNumber string   `json:"stateBlockNumber"`    // String, either a hex encoded number or a block tag for which state to base this simulation on. Can use "latest"
+	Timestamp        int64    `json:"timestamp,omitempty"` // Number, the timestamp to use for this bundle simulation, in seconds since the unix epoch
+	Timeout          int64    `json:"timeout,omitempty"`
+	GasLimit         uint64   `json:"gasLimit,omitempty"`
+	Difficulty       uint64   `json:"difficulty,omitempty"`
+	BaseFee          uint64   `json:"baseFee,omitempty"`
 }
 
 type FlashbotsCallBundleResult struct {

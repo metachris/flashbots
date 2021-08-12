@@ -125,3 +125,5 @@ func PrintBlock(block *types.Block) {
 	}
 	fmt.Printf("%d \t %s \t tx=%-4d \t gas=%d \t %s\n", block.Header().Number, t, len(block.Transactions()), block.GasUsed(), unclesStr)
 }
+
+var ColorGreen = "\033[1;32m%s\033[0m"

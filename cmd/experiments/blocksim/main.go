@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"os"
 
@@ -19,26 +20,18 @@ import (
 
 var mevGethNode string = os.Getenv("MEVGETH_NODE")
 var gethNode string = fbcommon.EnvStr("GETH_NODE", mevGethNode)
-
-// Example reorg:
-// - 12952442 0xbb3d9344bd0107b5c5f29aefcbf9c79bf1781030d8bfe5399fa51dbc6b4124fb (now uncle)
-// - 12952443 0x6285374dacc9cc073076d946326fb28448ddde6ba5aaf4da76def1e5b2552833 (child path of uncle)
-
-// Example blocks ok:
-// 12973115 0x3b0ea817cdc017c05904f030f668e47694b4564e8c41efa020dc3474ada75e91	tx: 9
-// 12973112 0xf9b1fc1989c22c2502dc29e48eb95a7abeedfab12c8bf02e072b982d88962262  tx: 184/171
-
-// Example blocks error:
-// 12973114 0x674370e10581bf43b88af5263970d73ab9feef39563d72252e95e8fa341b7023  tx: 159, error: nonce too high
-// 12973113 0x2e5b87f68aeba0dfc1b4abb96fece3b396064a9b97eb03f739755ffb349f5149  tx: 177  error: #92, nonce too high
+var debug bool
 
 func main() {
 	var err error
 
 	blockHash := flag.String("blockhash", "", "hash of block to simulate")
 	blockNumber := flag.Int64("blocknumber", -1, "number of block to simulate")
+	debugPtr := flag.Bool("debug", false, "print debug information")
 	flag.Parse()
-	// fmt.Println(1, *bl)
+
+	debug = *debugPtr
+
 	if *blockHash == "" && *blockNumber < 0 {
 		log.Fatal("No block given")
 	}
@@ -53,35 +46,91 @@ func main() {
 		block, err = client.BlockByHash(context.Background(), hash)
 		utils.Perror(err)
 
-		err = SimulateBlock(block, 0, true)
-		if err != nil {
-			fmt.Println(err)
-		}
-		return
-
 	} else {
 		if *blockNumber == 0 {
 			block, err = client.BlockByNumber(context.Background(), nil)
+			utils.Perror(err)
 		} else if *blockNumber > 0 {
 			block, err = client.BlockByNumber(context.Background(), big.NewInt(*blockNumber))
+			utils.Perror(err)
 		}
 
-		utils.Perror(err)
-		breakingTxIndex := FindBreakingTx(block)
-		if breakingTxIndex >= 0 {
-			_tx := block.Transactions()[breakingTxIndex]
-			fmt.Println("\nblock", block.Number(), "has breaking tx at index", breakingTxIndex, _tx.Hash(), "- type:", _tx.Type())
-			fmt.Println("RLP:", fbcommon.TxToRlp(_tx))
-			for i, v := range block.Transactions()[:breakingTxIndex+1] {
-				fmt.Printf("%3d %s %d \n", i, v.Hash(), v.Type())
-			}
+		if len(block.Transactions()) == 0 {
+			fmt.Println("No transactions in this block")
+			return
+		}
+
+		// utils.Perror(err)
+		// breakingTxIndex := FindBreakingTx(block)
+		// if breakingTxIndex >= 0 {
+		// 	_tx := block.Transactions()[breakingTxIndex]
+		// 	fmt.Println("\nblock", block.Number(), "has breaking tx at index", breakingTxIndex, _tx.Hash(), "- type:", _tx.Type())
+		// 	fmt.Println("RLP:", fbcommon.TxToRlp(_tx))
+		// 	for i, v := range block.Transactions()[:breakingTxIndex+1] {
+		// 		fmt.Printf("%3d %s %d \n", i, v.Hash(), v.Type())
+		// 	}
+		// }
+	}
+
+	result, err := SimulateBlock(block, 0, debug)
+	utils.Perror(err)
+	earnings := new(big.Int)
+	earnings.SetString(result.CoinbaseDiff, 10)
+
+	// Iterate over all transactions - add sent value back into earnings, remove received value
+	for _, tx := range block.Transactions() {
+		from, fromErr := types.Sender(types.LatestSignerForChainID(tx.ChainId()), tx)
+		to := tx.To()
+		txIsFromCoinbase := fromErr == nil && from == block.Coinbase()
+		txIsToCoinbase := to != nil && *to == block.Coinbase()
+
+		// Check if sent from coinbase address to somewhere else
+		if txIsFromCoinbase {
+			fmt.Println("outgoing tx from", from, "to", to)
+			earnings = new(big.Int).Add(earnings, tx.Value())
+		}
+
+		// Check if received at coinbase address from somewhere else
+		if txIsToCoinbase {
+			fmt.Println("incoming tx from", from, "to", to)
+			earnings = new(big.Int).Sub(earnings, tx.Value())
 		}
 	}
-	// SimulateBlock(block)
+
+	// totalEarningsViaMevGeth := new(big.Int).Add(earnings, twoEthInWei)
+
+	fmt.Printf("callBundle sim: %d/%d tx, block %d %s\n", len(block.Transactions()), len(result.Results), block.NumberU64(), block.Hash())
+	fmt.Printf("- result.CoinbaseDiff:      %22s wei %24s ETH\n", result.CoinbaseDiff, utils.WeiBigIntToEthString(earnings, 10))
+	fmt.Printf("- result.GasFees:           %22s wei %24s ETH\n", result.GasFees, WeiStrToEth(result.GasFees))
+	fmt.Printf("- result.EthSentToCoinbase: %22s wei %24s ETH\n", result.EthSentToCoinbase, WeiStrToEth(result.EthSentToCoinbase))
+	// fmt.Printf("- totalEarnings: %28s / %s ETH\n", totalEarningsViaMevGeth, utils.WeiBigIntToEthString(totalEarningsViaMevGeth, 10))
+
+	client2, err := ethclient.Dial(mevGethNode)
+	utils.Perror(err)
+	es := fbcommon.NewEarningsService(client2)
+	earningsServiceResult, err := es.GetBlockCoinbaseEarnings(block)
+	utils.Perror(err)
+
+	twoEthInWei := new(big.Int).Mul(common.Big2, big.NewInt(int64(math.Pow10(18))))
+	minerFeesTotal := new(big.Int).Sub(earningsServiceResult, twoEthInWei)
+
+	fmt.Printf("\nearningsService: %33s wei %24s ETH\n", minerFeesTotal.String(), utils.WeiBigIntToEthString(minerFeesTotal, 10))
+
+	if minerFeesTotal.Cmp(earnings) == 0 {
+		utils.ColorPrintf(fbcommon.ColorGreen, "Results match!\n")
+	} else {
+		utils.ColorPrintf(utils.ErrorColor, "mismatch!\n")
+	}
+}
+
+func WeiStrToEth(w string) string {
+	bi := new(big.Int)
+	bi.SetString(w, 10)
+	return utils.WeiBigIntToEthString(bi, 10)
 }
 
 // numTx is the maximum number of tx to include (used for troubleshooting). default 0 (all transactions)
-func SimulateBlock(block *types.Block, maxTx int, debug bool) error {
+func SimulateBlock(block *types.Block, maxTx int, debug bool) (*ethrpc.FlashbotsCallBundleResponse, error) {
 	if debug {
 		fmt.Printf("Simulating block %s 0x%x %s \t %d tx \t timestamp: %d\n", block.Number(), block.Number(), block.Header().Hash(), len(block.Transactions()), block.Header().Time)
 	}
@@ -116,25 +165,29 @@ func SimulateBlock(block *types.Block, maxTx int, debug bool) error {
 		Txs:              txs,
 		BlockNumber:      fmt.Sprintf("0x%x", block.Number()),
 		StateBlockNumber: block.ParentHash().Hex(),
+		GasLimit:         block.GasLimit(),
+		Difficulty:       block.Difficulty().Uint64(),
+		BaseFee:          block.BaseFee().Uint64(),
+		// BlockNumber:      fmt.Sprintf("0x%x", block.Number()),
+		// StateBlockNumber: fmt.Sprintf("0x%x", block.NumberU64()-1),
 	}
 
 	rpcClient := ethrpc.New(mevGethNode)
-	// rpcClient.Debug = true
+	rpcClient.Debug = debug
 
 	privateKey, _ := crypto.GenerateKey()
 	result, err := rpcClient.FlashbotsCallBundle(privateKey, param)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// fmt.Println(result)
-	fmt.Println("Coinbase diff:", result.CoinbaseDiff)
-	return nil
+	// fmt.Println("Coinbase diff:", result.CoinbaseDiff)
+	return &result, nil
 }
 
 // One tx breaks the simulation. Find the tx.
 func FindBreakingTx(block *types.Block) (breakingTxIndex int) {
-	var err error
 	numTransactions := len(block.Transactions()) // on first run, include all transactions
 	if numTransactions == 0 {
 		return -1
@@ -150,7 +203,7 @@ func FindBreakingTx(block *types.Block) (breakingTxIndex int) {
 		fmt.Println("")
 
 		// fmt.Println("\ntrying num tx:", numTransactions)
-		err = SimulateBlock(block, numTransactions, true)
+		_, err := SimulateBlock(block, numTransactions, true)
 		hasError := err != nil
 
 		// fmt.Println(numTransactions, isFirst, hasError, err)
