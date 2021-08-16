@@ -62,6 +62,8 @@ func main() {
 	}
 
 	rpc := flashbotsrpc.NewFlashbotsRPC(mevGethNode)
+	// rpc.Debug = true
+
 	privateKey, _ := crypto.GenerateKey()
 	result, err := rpc.FlashbotsSimulateBlock(privateKey, block, 0)
 	utils.Perror(err)
@@ -90,7 +92,7 @@ func main() {
 
 	// totalEarningsViaMevGeth := new(big.Int).Add(earnings, twoEthInWei)
 
-	fmt.Printf("callBundle sim: %d/%d tx, block %d %s\n", len(block.Transactions()), len(result.Results), block.NumberU64(), block.Hash())
+	fmt.Printf("callBundle sim: %d/%d tx, block %d %s\n", len(result.Results), len(block.Transactions()), block.NumberU64(), block.Hash())
 	fmt.Printf("- result.CoinbaseDiff:      %22s wei %24s ETH\n", result.CoinbaseDiff, utils.WeiBigIntToEthString(earnings, 10))
 	fmt.Printf("- result.GasFees:           %22s wei %24s ETH\n", result.GasFees, WeiStrToEth(result.GasFees))
 	fmt.Printf("- result.EthSentToCoinbase: %22s wei %24s ETH\n", result.EthSentToCoinbase, WeiStrToEth(result.EthSentToCoinbase))
