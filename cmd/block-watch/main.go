@@ -157,9 +157,9 @@ func watch(client *ethclient.Client) {
 						}
 
 						// Send failed TX to Discord
-						if sendErrorsToDiscord && check.TriggerAlertOnFailedTx {
-							SendToDiscord(check.Sprint(false, true, false))
-						}
+						// if sendErrorsToDiscord && check.TriggerAlertOnFailedTx {
+						// 	SendToDiscord(check.Sprint(false, true, false))
+						// }
 
 						// Count errors
 						if check.HasSeriousErrors() || check.HasLessSeriousErrors() { // update and print miner error count on serious and less-serious errors

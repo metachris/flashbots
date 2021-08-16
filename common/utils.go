@@ -76,6 +76,12 @@ func TxToRlp(tx *types.Transaction) string {
 	return fmt.Sprintf("%x", buff.Bytes())
 }
 
+func BlockToRlp(block *types.Block) string {
+	var buff bytes.Buffer
+	block.EncodeRLP(&buff)
+	return fmt.Sprintf("%x", buff.Bytes())
+}
+
 func EnvStr(key string, defaultvalue string) string {
 	res := os.Getenv(key)
 	if res != "" {

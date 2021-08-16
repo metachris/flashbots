@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/metachris/flashbots/api/ethrpc"
+	flashbotsrpc "github.com/metachris/flashbots-rpc"
 	fbcommon "github.com/metachris/flashbots/common"
 	"github.com/metachris/go-ethutils/utils"
 )
@@ -59,43 +59,34 @@ func main() {
 			fmt.Println("No transactions in this block")
 			return
 		}
-
-		// utils.Perror(err)
-		// breakingTxIndex := FindBreakingTx(block)
-		// if breakingTxIndex >= 0 {
-		// 	_tx := block.Transactions()[breakingTxIndex]
-		// 	fmt.Println("\nblock", block.Number(), "has breaking tx at index", breakingTxIndex, _tx.Hash(), "- type:", _tx.Type())
-		// 	fmt.Println("RLP:", fbcommon.TxToRlp(_tx))
-		// 	for i, v := range block.Transactions()[:breakingTxIndex+1] {
-		// 		fmt.Printf("%3d %s %d \n", i, v.Hash(), v.Type())
-		// 	}
-		// }
 	}
 
-	result, err := SimulateBlock(block, 0, debug)
+	rpc := flashbotsrpc.NewFlashbotsRPC(mevGethNode)
+	privateKey, _ := crypto.GenerateKey()
+	result, err := rpc.FlashbotsSimulateBlock(privateKey, block, 0)
 	utils.Perror(err)
 	earnings := new(big.Int)
 	earnings.SetString(result.CoinbaseDiff, 10)
 
-	// Iterate over all transactions - add sent value back into earnings, remove received value
-	for _, tx := range block.Transactions() {
-		from, fromErr := types.Sender(types.LatestSignerForChainID(tx.ChainId()), tx)
-		to := tx.To()
-		txIsFromCoinbase := fromErr == nil && from == block.Coinbase()
-		txIsToCoinbase := to != nil && *to == block.Coinbase()
+	// // Iterate over all transactions - add sent value back into earnings, remove received value
+	// for _, tx := range block.Transactions() {
+	// 	from, fromErr := types.Sender(types.LatestSignerForChainID(tx.ChainId()), tx)
+	// 	to := tx.To()
+	// 	txIsFromCoinbase := fromErr == nil && from == block.Coinbase()
+	// 	txIsToCoinbase := to != nil && *to == block.Coinbase()
 
-		// Check if sent from coinbase address to somewhere else
-		if txIsFromCoinbase {
-			fmt.Println("outgoing tx from", from, "to", to)
-			earnings = new(big.Int).Add(earnings, tx.Value())
-		}
+	// 	// Check if sent from coinbase address to somewhere else
+	// 	if txIsFromCoinbase {
+	// 		fmt.Println("outgoing tx from", from, "to", to)
+	// 		earnings = new(big.Int).Add(earnings, tx.Value())
+	// 	}
 
-		// Check if received at coinbase address from somewhere else
-		if txIsToCoinbase {
-			fmt.Println("incoming tx from", from, "to", to)
-			earnings = new(big.Int).Sub(earnings, tx.Value())
-		}
-	}
+	// 	// Check if received at coinbase address from somewhere else
+	// 	if txIsToCoinbase {
+	// 		fmt.Println("incoming tx from", from, "to", to)
+	// 		earnings = new(big.Int).Sub(earnings, tx.Value())
+	// 	}
+	// }
 
 	// totalEarningsViaMevGeth := new(big.Int).Add(earnings, twoEthInWei)
 
@@ -129,63 +120,6 @@ func WeiStrToEth(w string) string {
 	return utils.WeiBigIntToEthString(bi, 10)
 }
 
-// numTx is the maximum number of tx to include (used for troubleshooting). default 0 (all transactions)
-func SimulateBlock(block *types.Block, maxTx int, debug bool) (*ethrpc.FlashbotsCallBundleResponse, error) {
-	if debug {
-		fmt.Printf("Simulating block %s 0x%x %s \t %d tx \t timestamp: %d\n", block.Number(), block.Number(), block.Header().Hash(), len(block.Transactions()), block.Header().Time)
-	}
-
-	txs := make([]string, 0)
-	for _, tx := range block.Transactions() {
-		// fmt.Println("tx", i, tx.Hash(), "type", tx.Type())
-
-		rlp := fbcommon.TxToRlp(tx)
-
-		// Might need to strip beginning bytes
-		if rlp[:2] == "b9" {
-			rlp = rlp[6:]
-		} else if rlp[:2] == "b8" {
-			rlp = rlp[4:]
-		}
-
-		// callBundle expects a 0x prefix
-		rlp = "0x" + rlp
-		txs = append(txs, rlp)
-
-		if maxTx > 0 && len(txs) == maxTx {
-			break
-		}
-	}
-
-	if debug {
-		fmt.Printf("sending %d tx for simulation to %s...\n", len(txs), mevGethNode)
-	}
-
-	param := ethrpc.FlashbotsCallBundleParam{
-		Txs:              txs,
-		BlockNumber:      fmt.Sprintf("0x%x", block.Number()),
-		StateBlockNumber: block.ParentHash().Hex(),
-		GasLimit:         block.GasLimit(),
-		Difficulty:       block.Difficulty().Uint64(),
-		BaseFee:          block.BaseFee().Uint64(),
-		// BlockNumber:      fmt.Sprintf("0x%x", block.Number()),
-		// StateBlockNumber: fmt.Sprintf("0x%x", block.NumberU64()-1),
-	}
-
-	rpcClient := ethrpc.New(mevGethNode)
-	rpcClient.Debug = debug
-
-	privateKey, _ := crypto.GenerateKey()
-	result, err := rpcClient.FlashbotsCallBundle(privateKey, param)
-	if err != nil {
-		return nil, err
-	}
-
-	// fmt.Println(result)
-	// fmt.Println("Coinbase diff:", result.CoinbaseDiff)
-	return &result, nil
-}
-
 // One tx breaks the simulation. Find the tx.
 func FindBreakingTx(block *types.Block) (breakingTxIndex int) {
 	numTransactions := len(block.Transactions()) // on first run, include all transactions
@@ -199,11 +133,16 @@ func FindBreakingTx(block *types.Block) (breakingTxIndex int) {
 	lastStepSize := numTransactions
 	lastWorking := 0
 
+	rpc := flashbotsrpc.NewFlashbotsRPC(mevGethNode)
+	rpc.Debug = true
+
+	privateKey, _ := crypto.GenerateKey()
+
 	for {
 		fmt.Println("")
 
 		// fmt.Println("\ntrying num tx:", numTransactions)
-		_, err := SimulateBlock(block, numTransactions, true)
+		_, err := rpc.FlashbotsSimulateBlock(privateKey, block, numTransactions)
 		hasError := err != nil
 
 		// fmt.Println(numTransactions, isFirst, hasError, err)
