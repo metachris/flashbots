@@ -10,35 +10,21 @@ Uses:
 * https://github.com/ethereum/go-ethereum
 * https://github.com/metachris/go-ethutils
 
-Notes:
+Related:
 
-* There are a lot of API calls (one for each tx), it will only be fast if you are on (or close to) the geth node.
-* Ideas, feedback and contributions are welcome.
+* https://github.com/metachris/flashbots-rpc (callBundle, etc)
+
+
+Good starting points:
+
+* `cmd/api-test/main.go`
+* `cmd/block-watch/main.go`
 
 Reach out: [twitter.com/metachris](https://twitter.com/metachris)
 
 ---
 
-## Flashbots APIs
-
-### RPC: userstats, CallBundle
-
-https://docs.flashbots.net/flashbots-auction/searchers/advanced/rpc-endpoint
-
-```bash
-go get github.com/metachris/flashbots/api/ethrpc
-```
-
-Usage:
-
-```go
-privateKey, _ := crypto.GenerateKey()
-result, err := rpcClient.FlashbotsGetUserStats(privateKey, 12960506)
-fmt.Println(result)
-```
-
-
-### Blocks & Transactions 
+## Flashbots Blocks & Transactions API
 
 https://blocks.flashbots.net/
 
@@ -62,10 +48,3 @@ block, err := api.GetBlocks(&opts)
 txs, err := GetTransactions(nil)
 ```
 
----
-
-## Getting Started
-
-Good starting points:
-* `cmd/api-test/main.go`
-* `cmd/block-watch/main.go`
