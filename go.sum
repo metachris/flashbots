@@ -262,14 +262,8 @@ github.com/mattn/go-tty v0.0.0-20180907095812-13ff1204f104/go.mod h1:XPvLUNfbS4f
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/metachris/eth-go-bindings v0.5.0 h1:DpPAdHJLVAwV/NLDDD0SS2MZUGzP2qCRDTL4KP8qYjk=
 github.com/metachris/eth-go-bindings v0.5.0/go.mod h1:vd9ktO3U8qNf1vhRPInWJCbqjzf9IZQ6TslR179r8c0=
-github.com/metachris/flashbots-rpc v0.0.0-20210816142318-8f8d5da50e73 h1:/LlliVYnJQ4FpTkpMHCoeei9NrDQMjP77Vf6FxquW3w=
-github.com/metachris/flashbots-rpc v0.0.0-20210816142318-8f8d5da50e73/go.mod h1:HYls2JCvQBFya3bnna9Vk9Y2uEUPBEqfsaoShG7w+6Q=
-github.com/metachris/flashbots-rpc v0.1.1-0.20210816195227-0b9486ad6e41 h1:IadMLuTIO1S35crIlrAWG9HXHCA5GE37ham0LUH0TCw=
-github.com/metachris/flashbots-rpc v0.1.1-0.20210816195227-0b9486ad6e41/go.mod h1:HYls2JCvQBFya3bnna9Vk9Y2uEUPBEqfsaoShG7w+6Q=
-github.com/metachris/flashbots-rpc v0.1.1-0.20210816195434-0de303f02c86 h1:rEP9Q/aCTkgfz9lPeiH6+kktS4k76UB6v9BjKzr57q8=
-github.com/metachris/flashbots-rpc v0.1.1-0.20210816195434-0de303f02c86/go.mod h1:HYls2JCvQBFya3bnna9Vk9Y2uEUPBEqfsaoShG7w+6Q=
-github.com/metachris/flashbots-rpc v0.1.1 h1:+MfxqW/dDVB1hVfHJtlmp67NXL0araw6h7BkG3/xMTQ=
-github.com/metachris/flashbots-rpc v0.1.1/go.mod h1:HYls2JCvQBFya3bnna9Vk9Y2uEUPBEqfsaoShG7w+6Q=
+github.com/metachris/flashbots-rpc v0.1.2 h1:08+jWRk/BcBjYFRNB90RQpW1Wt9nCEQ2w1E5Xzy1SAw=
+github.com/metachris/flashbots-rpc v0.1.2/go.mod h1:HYls2JCvQBFya3bnna9Vk9Y2uEUPBEqfsaoShG7w+6Q=
 github.com/metachris/go-ethutils v0.4.7 h1:KcbCyG4Wgd004QIUg55t3Fz2hVB0vgcYGOI3qSjrwR4=
 github.com/metachris/go-ethutils v0.4.7/go.mod h1:HUZaIue4fgyDt2T7IkY+8lDkoTBxFTsBdr9w7a0ZCaM=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
@@ -386,8 +380,6 @@ golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d/go.mod h1:LzIPMQfyMNhhGPh
 golang.org/x/crypto v0.0.0-20200510223506-06a226fb4e37/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2/go.mod h1:T9bdIzuCu7OtxOm1hfPfRQxPLYneinmdGuTeoZ9dtd4=
-golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 h1:/UOmuWzQfxxo9UtlXMwuQU8CMgg1eZXqTRwkSQJWKOI=
-golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e h1:VvfwVmMH40bpMeizC9/K7ipM5Qjucuu16RWfneFPyhQ=
 golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/exp v0.0.0-20180321215751-8460e604b9de/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
@@ -485,8 +477,6 @@ golang.org/x/sys v0.0.0-20210316164454-77fc1eacc6aa/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20210324051608-47abb6519492/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210420205809-ac73e9fd8988/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e h1:WUoyKPm6nCo1BnNUvPGnFG3T5DUVem42yDJZZ4CNxMA=
-golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912 h1:uCLL3g5wH2xjxVREVuAbP9JM5PPKjRbXKRa6IBjkzmU=
 golang.org/x/sys v0.0.0-20210816183151-1e6c022a8912/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=

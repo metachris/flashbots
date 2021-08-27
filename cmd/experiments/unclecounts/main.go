@@ -39,6 +39,7 @@ func main() {
 
 	mevGethUri = *flag.String("eth", os.Getenv("MEVGETH_NODE"), "mev-geth node URI")
 	startDate := flag.String("start", "", "time offset")
+	endDate := flag.String("end", "", "time offset")
 	// endDate := flag.String("end", "", "block number or time offset or date (yyyy-mm-dd) (optional)")
 	flag.Parse()
 
@@ -50,24 +51,33 @@ func main() {
 		log.Fatal("Missing start")
 	}
 
+	if *endDate == "" {
+		log.Fatal("Missing end")
+	}
+
 	fmt.Printf("Connecting to %s ... ", mevGethUri)
 	client, err = ethclient.Dial(mevGethUri)
 	utils.Perror(err)
 	fmt.Printf("ok\n")
 
-	startTimeOffsetSec, err := fbcommon.TimeStringToSec(*startDate)
-	utils.Perror(err)
-
 	// Find start block
-	now := time.Now()
-	startTime := now.Add(time.Duration(startTimeOffsetSec) * time.Second * -1)
+	startTime, err := utils.DateToTime(*startDate, 0, 0, 0)
+	utils.Perror(err)
+	// startTimeOffsetSec, err := fbcommon.TimeStringToSec(*startDate)
+	// utils.Perror(err)
+	// now := time.Now()
+	// startTime := now.Add(time.Duration(startTimeOffsetSec) * time.Second * -1)
 	startBlockHeader, err := utils.GetFirstBlockHeaderAtOrAfterTime(client, startTime)
 	utils.Perror(err)
 	tb1 := time.Unix(int64(startBlockHeader.Time), 0).UTC()
 	fmt.Println("first block:", startBlockHeader.Number, tb1)
 
 	// Find end block
-	latestBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+	endTime, err := utils.DateToTime(*endDate, 0, 0, 0)
+	utils.Perror(err)
+
+	// latestBlockHeader, err := client.HeaderByNumber(context.Background(), nil)
+	latestBlockHeader, err := utils.GetFirstBlockHeaderAtOrAfterTime(client, endTime)
 	utils.Perror(err)
 	tb2 := time.Unix(int64(latestBlockHeader.Time), 0).UTC()
 	fmt.Println("last block: ", latestBlockHeader.Number, tb2)
@@ -176,5 +186,5 @@ func PrintResultUncler() {
 	}
 
 	unclePercentage := float64(unclesTotal) / float64(blocksTotal) * 100
-	fmt.Printf("%d unclings / %d valid blocks = %.2f %%\n", unclesTotal, blocksTotal, unclePercentage)
+	fmt.Printf("%d uncles / %d valid blocks = %.2f %%\n", unclesTotal, blocksTotal, unclePercentage)
 }
