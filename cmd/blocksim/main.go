@@ -75,6 +75,7 @@ func main() {
 	rpc := flashbotsrpc.NewFlashbotsRPC(*mevGethUriPtr)
 	rpc.Debug = *debugPtr
 
+	fmt.Println("Simulating block...")
 	privateKey, _ := crypto.GenerateKey()
 	result, err := rpc.FlashbotsSimulateBlock(privateKey, block, 0)
 	utils.Perror(err)

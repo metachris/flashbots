@@ -129,7 +129,7 @@ func PrintBlock(block *types.Block) {
 	if len(block.Uncles()) > 0 {
 		unclesStr = fmt.Sprintf("uncles=%d", len(block.Uncles()))
 	}
-	fmt.Printf("%d \t %s \t tx=%-4d \t gas=%d \t %s\n", block.Header().Number, t, len(block.Transactions()), block.GasUsed(), unclesStr)
+	fmt.Printf("Block %d %s \t miner: %s \t %s \t tx=%-4d \t gas=%d \t %s\n", block.NumberU64(), block.Hash(), block.Coinbase(), t, len(block.Transactions()), block.GasUsed(), unclesStr)
 }
 
 var ColorGreen = "\033[1;32m%s\033[0m"
