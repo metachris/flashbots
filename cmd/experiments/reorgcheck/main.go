@@ -142,11 +142,22 @@ func main() {
 
 	fmt.Println("\nTransactions:")
 	for i, entry := range result.Results {
+		_incl := ""
+		if !isCanonicalBlock {
+			// Where was this tx included?
+			r, err := gethClient.TransactionReceipt(context.Background(), common.HexToHash(entry.TxHash))
+			if err != nil {
+				_incl = fmt.Sprintf("included-in: ? %s", err)
+			} else {
+				_incl = fmt.Sprintf("included-in: %s", r.BlockNumber)
+			}
+		}
+
 		_to := entry.ToAddress
 		if detail, found := addressLookup.Cache[strings.ToLower(entry.ToAddress)]; found {
 			_to = fmt.Sprintf("%s (%s)", _to, detail.Name)
 		}
-		fmt.Printf("%4d %s cbD=%s, gasFee=%s, ethSentToCb=%s, to=%s\n", i+1, entry.TxHash, weiStrToEthStr(entry.CoinbaseDiff, 4), weiStrToEthStr(entry.GasFees, 4), weiStrToEthStr(entry.EthSentToCoinbase, 4), _to)
+		fmt.Printf("%4d %s cbD=%s, gasFee=%s, ethSentToCb=%s, to=%s \t %s\n", i+1, entry.TxHash, weiStrToEthStr(entry.CoinbaseDiff, 4), weiStrToEthStr(entry.GasFees, 4), weiStrToEthStr(entry.EthSentToCoinbase, 4), _to, _incl)
 
 		cbDiffWei := new(big.Float)
 		cbDiffWei, _ = cbDiffWei.SetString(entry.CoinbaseDiff)

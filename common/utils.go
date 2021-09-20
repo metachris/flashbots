@@ -17,6 +17,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+func StrToBigInt(s string) *big.Int {
+	i := new(big.Int)
+	i.SetString(s, 10)
+	return i
+}
+
 func BigFloatToEString(f *big.Float, prec int) string {
 	s1 := f.Text('f', 0)
 	if len(s1) >= 16 {
