@@ -44,6 +44,7 @@ func main() {
 	gethUriPtr := flag.String("geth", "", "geth node URI for tx lookup")
 	blockHash := flag.String("hash", "", "hash of block to simulate")
 	blockNumber := flag.Int64("number", -1, "number of block to simulate")
+	checkTxPtr := flag.Bool("checktx", false, "if non-canonical block, additional transaction checks")
 	debugPtr := flag.Bool("debug", false, "print debug information")
 	flag.Parse()
 
@@ -141,12 +142,26 @@ func main() {
 	}
 
 	fmt.Println("\nTransactions:")
+	txInclusionBlocks := make(map[uint64]int)
 	for i, entry := range result.Results {
+		_incl := ""
+		if *checkTxPtr && !isCanonicalBlock {
+			// Where was this tx included?
+			r, err := gethClient.TransactionReceipt(context.Background(), common.HexToHash(entry.TxHash))
+			if err != nil {
+				_incl = fmt.Sprintf("included-in: - (%s)", err)
+				txInclusionBlocks[0] += 1
+			} else {
+				_incl = fmt.Sprintf("included-in: %s", r.BlockNumber)
+				txInclusionBlocks[r.BlockNumber.Uint64()] += 1
+			}
+		}
+
 		_to := entry.ToAddress
-		if detail, found := addressLookup.Cache[strings.ToLower(entry.ToAddress)]; found {
+		if detail, found := addressLookup.Cache[strings.ToLower(entry.ToAddress)]; found && len(detail.Name) > 0 {
 			_to = fmt.Sprintf("%s (%s)", _to, detail.Name)
 		}
-		fmt.Printf("%4d %s cbD=%s, gasFee=%s, ethSentToCb=%s, to=%s\n", i+1, entry.TxHash, weiStrToEthStr(entry.CoinbaseDiff, 4), weiStrToEthStr(entry.GasFees, 4), weiStrToEthStr(entry.EthSentToCoinbase, 4), _to)
+		fmt.Printf("%4d %s \t cbD=%8s, gasFee=%8s, ethSentToCb=%8s \t to=%-64s   %s\n", i+1, entry.TxHash, weiStrToEthStr(entry.CoinbaseDiff, 4), weiStrToEthStr(entry.GasFees, 4), weiStrToEthStr(entry.EthSentToCoinbase, 4), _to, _incl)
 
 		cbDiffWei := new(big.Float)
 		cbDiffWei, _ = cbDiffWei.SetString(entry.CoinbaseDiff)
@@ -160,7 +175,23 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\n%d/%d tx needed for 80%% of miner value\n", numTxNeededFor80PercentValue, len(result.Results))
+	fmt.Printf("\n%d/%d tx needed for 80%% of miner value.\n", numTxNeededFor80PercentValue, len(result.Results))
+
+	if *checkTxPtr && !isCanonicalBlock {
+		fmt.Println("\nTransactions included in these blocks:")
+		for blockNum, count := range txInclusionBlocks {
+			_blockNum := fmt.Sprintf("%d", blockNum)
+			if blockNum == 0 {
+				_blockNum = "missing"
+			}
+
+			if blockNum == block.NumberU64() {
+				_blockNum += " (sibling)"
+			}
+
+			fmt.Printf("- %-8s: %3d\n", _blockNum, count)
+		}
+	}
 }
 
 func printBlock(block *types.Block) {
